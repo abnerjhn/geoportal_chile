@@ -19,12 +19,12 @@ frontend/dist/
 frontend/.cache/
 .vite/
 
-# ---------- Datos pesados ----------
+# ---------- Datos pesados (generados localmente) ----------
 # La DB SpatiaLite se genera con el pipeline ETL
 data/*.sqlite
 data/*.db
 
-# GeoJSON pesados del frontend (se copian desde data_raw)
+# GeoJSON del frontend (se copian desde data_raw en build)
 frontend/public/data/*.json
 
 # ---------- IDE / OS ----------
@@ -38,10 +38,12 @@ Thumbs.db
 
 # ---------- Logs / Debug ----------
 *.log
-*.txt
-!requirements.txt
-!README.md
 
 # ---------- Temp ----------
 *.tmp
 *.bak
+
+# ---------- No ignorar archivos necesarios ----------
+!requirements.txt
+!README.md
+!data_raw/keys.json

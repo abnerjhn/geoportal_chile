@@ -26,8 +26,10 @@ def load_layers():
     def random_point(lon_min, lon_max, lat_min, lat_max):
         return Point(random.uniform(lon_min, lon_max), random.uniform(lat_min, lat_max))
 
-    DOWNLOADS_DIR = r"C:\Users\abner\Downloads"
-    DPA_DIR = r"d:\web_D_anctigravity\sig_chile\data_raw"
+    # Paths: configurable via environment variables, fallback to local defaults
+    DATA_RAW_DIR = os.environ.get('DATA_RAW_DIR', os.path.abspath(os.path.join(BASE_DIR, '..', 'data_raw')))
+    DOWNLOADS_DIR = os.environ.get('DOWNLOADS_DIR', DATA_RAW_DIR)
+    DPA_DIR = os.environ.get('DPA_DIR', DATA_RAW_DIR)
     layers = {}
     
     # 1. Sitios Prioritarios Integrados
