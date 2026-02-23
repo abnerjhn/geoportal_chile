@@ -69,5 +69,5 @@ WORKDIR /app/backend
 
 EXPOSE 8000
 
-# Use exec form CMD for proper signal handling
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Use exec form CMD with diagnostic startup
+CMD ["sh", "-c", "echo '[STARTUP] Checking database...' && ls -la /app/data/chile_territorial.sqlite && echo '[STARTUP] DB OK' && echo '[STARTUP] PORT=${PORT}' && exec python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
