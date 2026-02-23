@@ -3,7 +3,19 @@ import sqlite3
 
 # Ensure we get the absolute path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATABASE_PATH = os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite')
+_db_sqlite = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+_db_gpkg = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.gpkg'))
+
+# Try both extensions (GPKG is used as fallback when SpatiaLite driver isn't available)
+if os.path.exists(_db_sqlite):
+    DATABASE_PATH = _db_sqlite
+elif os.path.exists(_db_gpkg):
+    DATABASE_PATH = _db_gpkg
+else:
+    DATABASE_PATH = _db_sqlite  # Default, will show error at runtime
+    print(f"WARNING: Database not found at {_db_sqlite} or {_db_gpkg}")
+
+print(f"Database path: {DATABASE_PATH} (exists={os.path.exists(DATABASE_PATH)})")
 
 def get_db_connection():
     """Establece una conexión a SpatiaLite asegurando WAL y extensión cargada."""

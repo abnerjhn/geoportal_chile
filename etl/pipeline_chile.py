@@ -121,10 +121,12 @@ def load_layers():
     return layers
 
 def process_and_export():
-    print("Iniciando ETL con datos reales (GeoPandas + SpatiaLite)...")
+    print("Iniciando ETL con datos reales (GeoPandas)...")
     layers = load_layers()
         
     db_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
@@ -132,7 +134,11 @@ def process_and_export():
         except Exception as e:
             print(f"Error borrando DB anterior, cuidado con locks. {e}")
             
-    print(f"\nExportando {len(layers)} capas a SpatiaLite: {db_path}...")
+    print(f"\nExportando {len(layers)} capas a: {db_path}...")
+    
+    # Try SpatiaLite driver first, fall back to GPKG if it fails
+    driver = 'SQLite'
+    spatialite = True
     
     for name, gdf in layers.items():
         print(f" -> Exportando {name} ({len(gdf)} filas)...")
@@ -143,16 +149,41 @@ def process_and_export():
             if col != 'geometry':
                 if pd.api.types.is_string_dtype(export_gdf[col]) or pd.api.types.is_object_dtype(export_gdf[col]):
                     export_gdf[col] = export_gdf[col].astype(object)
-                
-        export_gdf.to_file(db_path, driver='SQLite', spatialite=True, layer=name)
         
-    print("\nAjustando la base de datos de salida (Modo WAL)...")
-    with sqlite3.connect(db_path) as sqlite_conn:
-        cursor = sqlite_conn.cursor()
-        cursor.execute('PRAGMA journal_mode=WAL;')
-        sqlite_conn.commit()
+        try:
+            export_gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
+            print(f"    OK ({driver}, spatialite={spatialite})")
+        except Exception as e:
+            print(f"    WARN: {driver} failed ({e}), retrying with GPKG driver...")
+            driver = 'GPKG'
+            spatialite = False
+            try:
+                export_gdf.to_file(db_path, driver=driver, layer=name)
+                print(f"    OK ({driver})")
+            except Exception as e2:
+                print(f"    ERROR: Both drivers failed for {name}: {e2}")
         
-    print(f"ETL finalizado. DB generada en: {db_path}")
+    # Verify the database was created
+    if os.path.exists(db_path):
+        size_mb = os.path.getsize(db_path) / 1024 / 1024
+        print(f"\nDB generada: {db_path} ({size_mb:.1f} MB)")
+        
+        # Set WAL mode for concurrent reads
+        try:
+            with sqlite3.connect(db_path) as sqlite_conn:
+                cursor = sqlite_conn.cursor()
+                cursor.execute('PRAGMA journal_mode=WAL;')
+                sqlite_conn.commit()
+                # List tables
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                tables = [r[0] for r in cursor.fetchall()]
+                print(f"Tablas en DB: {tables}")
+        except Exception as e:
+            print(f"WARN: Could not set WAL mode: {e}")
+    else:
+        print(f"\nERROR CRITICO: No se creó la base de datos en {db_path}")
+        
+    print("ETL finalizado.")
 
 if __name__ == '__main__':
     process_and_export()
