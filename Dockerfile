@@ -58,12 +58,16 @@ ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 RUN cd /app && python etl/pipeline_chile.py
 
 # VERIFY the database was created - FAIL the build if not
-RUN echo "=== Verifying database ===" && \
-    ls -la /app/data/ && \
-    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()" && \
-    echo "=== Database OK ==="
+RUN ls -la /app/data/chile_territorial.sqlite && \
+    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()"
+
+# Clean up raw data to reduce image size (~400MB saved)
+RUN rm -rf /app/data_raw
+
+# Set working directory to backend for uvicorn
+WORKDIR /app/backend
 
 EXPOSE 8000
 
-# Start server directly
-CMD cd /app/backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Use exec form CMD for proper signal handling
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
