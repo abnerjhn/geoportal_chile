@@ -14,12 +14,9 @@ RUN npm run build
 # --- Stage 2: Production Runtime ---
 FROM python:3.11-bookworm
 
-# Install SpatiaLite and GDAL native dependencies
+# Install only SpatiaLite module (GeoPandas/Fiona pip wheels bundle GDAL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-mod-spatialite \
-    libspatialite-dev \
-    gdal-bin \
-    libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
