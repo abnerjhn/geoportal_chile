@@ -12,14 +12,14 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Production Runtime ---
-FROM python:3.11-slim
+FROM python:3.11-bookworm
 
 # Install SpatiaLite and GDAL native dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-mod-spatialite \
-    libspatialite7 \
-    libgdal-dev \
+    libspatialite-dev \
     gdal-bin \
+    libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -52,7 +52,7 @@ RUN mkdir -p frontend/dist/data && \
     cp data_raw/comunas.json frontend/dist/data/comunas_simplified.json 2>/dev/null || true
 
 # Copy PMTiles if they exist
-COPY frontend/public/data/*.pmtiles frontend/dist/data/ 2>/dev/null || true
+COPY frontend/public/data/ frontend/dist/data/
 
 # Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw
