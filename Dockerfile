@@ -12,7 +12,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Production Runtime ---
-FROM python:3.11-bookworm
+FROM python:3.11-slim-bookworm
 
 # Install SpatiaLite module
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,11 +25,12 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code and ETL
+# Copy backend code, ETL, and startup script
 COPY backend/ ./backend/
 COPY etl/ ./etl/
+COPY startup.py ./
 
-# Copy raw data for ETL pipeline
+# Copy raw data for ETL pipeline (will be used at runtime on first start)
 COPY data_raw/ ./data_raw/
 
 # Create data directory
@@ -50,24 +51,11 @@ RUN mkdir -p frontend/dist/data && \
 COPY frontend/public/data/ /tmp/public_data/
 RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/public_data
 
-# Set environment variables with ABSOLUTE paths (no .. relative paths)
+# Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw
 ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 
-# Run ETL pipeline at BUILD TIME to generate SQLite database
-RUN cd /app && python etl/pipeline_chile.py
-
-# VERIFY the database was created - FAIL the build if not
-RUN ls -la /app/data/chile_territorial.sqlite && \
-    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()"
-
-# Clean up raw data to reduce image size (~400MB saved)
-RUN rm -rf /app/data_raw
-
-# Set working directory to backend for uvicorn
-WORKDIR /app/backend
-
 EXPOSE 8000
 
-# Use exec form CMD with diagnostic startup
-CMD ["sh", "-c", "echo '[STARTUP] Checking database...' && ls -la /app/data/chile_territorial.sqlite && echo '[STARTUP] DB OK' && echo '[STARTUP] PORT=${PORT}' && exec python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Use Python startup script (avoids CRLF issues with .sh scripts)
+CMD ["python", "/app/startup.py"]
