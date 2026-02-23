@@ -14,7 +14,7 @@ RUN npm run build
 # --- Stage 2: Production Runtime ---
 FROM python:3.11-bookworm
 
-# Install only SpatiaLite module (GeoPandas/Fiona pip wheels bundle GDAL)
+# Install SpatiaLite module
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libsqlite3-mod-spatialite \
     && rm -rf /var/lib/apt/lists/*
@@ -25,7 +25,7 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code
+# Copy backend code and ETL
 COPY backend/ ./backend/
 COPY etl/ ./etl/
 
@@ -38,26 +38,24 @@ RUN mkdir -p data
 # Copy built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
-# Copy GeoJSON data files needed by the frontend map
-# These are served as static assets from dist/data/
+# Copy GeoJSON data files to the frontend dist for map layers
 RUN mkdir -p frontend/dist/data && \
-    cp data_raw/concesiones.json frontend/dist/data/ 2>/dev/null || true && \
-    cp data_raw/Concesiones_Acuicultura_geo.json frontend/dist/data/concesiones.json 2>/dev/null || true && \
-    cp data_raw/ECMPO_geo.json frontend/dist/data/ecmpo.json 2>/dev/null || true && \
-    cp data_raw/Regional.json frontend/dist/data/regiones_simplified.json 2>/dev/null || true && \
-    cp data_raw/Provincias.json frontend/dist/data/provincias_simplified.json 2>/dev/null || true && \
-    cp data_raw/comunas.json frontend/dist/data/comunas_simplified.json 2>/dev/null || true
+    cp data_raw/Concesiones_Acuicultura_geo.json frontend/dist/data/concesiones.json && \
+    cp data_raw/ECMPO_geo.json frontend/dist/data/ecmpo.json && \
+    cp data_raw/Regional.json frontend/dist/data/regiones_simplified.json && \
+    cp data_raw/Provincias.json frontend/dist/data/provincias_simplified.json && \
+    cp data_raw/comunas.json frontend/dist/data/comunas_simplified.json
 
-# Copy PMTiles if they exist
-COPY frontend/public/data/ frontend/dist/data/
+# Copy PMTiles from frontend public to dist
+COPY frontend/public/data/*.pmtiles frontend/dist/data/
 
 # Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw
-ENV PORT=8000
 
-# Run ETL pipeline to generate SQLite database, then start server
-COPY start.sh ./
-RUN chmod +x start.sh
+# Run ETL pipeline at BUILD TIME to generate SQLite database
+RUN cd /app && python etl/pipeline_chile.py
 
 EXPOSE 8000
-CMD ["./start.sh"]
+
+# Start server directly (no start.sh to avoid CRLF issues)
+CMD cd /app/backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
