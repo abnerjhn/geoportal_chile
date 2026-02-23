@@ -1,21 +1,15 @@
 import os
 import sqlite3
 
-# Ensure we get the absolute path
+# Database path: use env var if set, otherwise resolve relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_db_sqlite = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
-_db_gpkg = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.gpkg'))
+_default_db = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+DATABASE_PATH = os.environ.get('DATABASE_PATH', _default_db)
 
-# Try both extensions (GPKG is used as fallback when SpatiaLite driver isn't available)
-if os.path.exists(_db_sqlite):
-    DATABASE_PATH = _db_sqlite
-elif os.path.exists(_db_gpkg):
-    DATABASE_PATH = _db_gpkg
-else:
-    DATABASE_PATH = _db_sqlite  # Default, will show error at runtime
-    print(f"WARNING: Database not found at {_db_sqlite} or {_db_gpkg}")
-
-print(f"Database path: {DATABASE_PATH} (exists={os.path.exists(DATABASE_PATH)})")
+print(f"[DB] Path configured: {DATABASE_PATH}")
+print(f"[DB] File exists: {os.path.exists(DATABASE_PATH)}")
+if os.path.exists(DATABASE_PATH):
+    print(f"[DB] File size: {os.path.getsize(DATABASE_PATH)/1024/1024:.1f} MB")
 
 def get_db_connection():
     """Establece una conexión a SpatiaLite asegurando WAL y extensión cargada."""

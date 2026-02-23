@@ -33,7 +33,7 @@ COPY etl/ ./etl/
 COPY data_raw/ ./data_raw/
 
 # Create data directory
-RUN mkdir -p data
+RUN mkdir -p /app/data
 
 # Copy built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
@@ -50,13 +50,20 @@ RUN mkdir -p frontend/dist/data && \
 COPY frontend/public/data/ /tmp/public_data/
 RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/public_data
 
-# Set environment variables
+# Set environment variables with ABSOLUTE paths (no .. relative paths)
 ENV DATA_RAW_DIR=/app/data_raw
+ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 
 # Run ETL pipeline at BUILD TIME to generate SQLite database
 RUN cd /app && python etl/pipeline_chile.py
 
+# VERIFY the database was created - FAIL the build if not
+RUN echo "=== Verifying database ===" && \
+    ls -la /app/data/ && \
+    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()" && \
+    echo "=== Database OK ==="
+
 EXPOSE 8000
 
-# Start server directly (no start.sh to avoid CRLF issues)
+# Start server directly
 CMD cd /app/backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
