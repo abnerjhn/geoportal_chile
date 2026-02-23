@@ -46,8 +46,9 @@ RUN mkdir -p frontend/dist/data && \
     cp data_raw/Provincias.json frontend/dist/data/provincias_simplified.json && \
     cp data_raw/comunas.json frontend/dist/data/comunas_simplified.json
 
-# Copy PMTiles from frontend public to dist
-COPY frontend/public/data/*.pmtiles frontend/dist/data/
+# Copy PMTiles from frontend public to dist (if present in git)
+COPY frontend/public/data/ /tmp/public_data/
+RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/public_data
 
 # Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw

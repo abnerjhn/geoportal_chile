@@ -26,6 +26,38 @@ from database import get_db_connection, DATABASE_PATH
 
 app = FastAPI(title="Geoportal Chile API", version="1.0.0")
 
+@app.get("/api/health")
+async def health():
+    """Diagnostic endpoint to verify database and SpatiaLite status."""
+    import sqlite3
+    info = {"status": "ok", "db_exists": False, "tables": [], "spatialite": False}
+    try:
+        db_path = DATABASE_PATH
+        info["db_path"] = db_path
+        info["db_exists"] = os.path.exists(db_path)
+        if info["db_exists"]:
+            info["db_size_mb"] = round(os.path.getsize(db_path) / 1024 / 1024, 1)
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tables = [row[0] for row in cursor.fetchall()]
+            info["tables"] = tables
+            for t in tables:
+                try:
+                    cursor.execute(f"SELECT COUNT(*) FROM \"{t}\"")
+                    info[f"count_{t}"] = cursor.fetchone()[0]
+                except:
+                    pass
+            try:
+                cursor.execute("SELECT spatialite_version()")
+                info["spatialite"] = cursor.fetchone()[0]
+            except:
+                info["spatialite"] = False
+            conn.close()
+    except Exception as e:
+        info["error"] = str(e)
+    return info
+
 # Limitamos hilos concurrentes
 # En modo WAL, las lecturas en SQLite pueden ser concurrentes sin bloqueos severos
 executor = ThreadPoolExecutor(max_workers=5)
