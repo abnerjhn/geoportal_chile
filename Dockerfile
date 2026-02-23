@@ -12,7 +12,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # --- Stage 2: Production Runtime ---
-FROM python:3.11-slim-bookworm
+FROM python:3.11-bookworm
 
 # Install SpatiaLite module
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -25,16 +25,16 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend code, ETL, and startup script
+# Copy backend code and ETL
 COPY backend/ ./backend/
 COPY etl/ ./etl/
 COPY startup.py ./
 
-# Copy raw data for ETL pipeline (will be used at runtime on first start)
+# Copy raw data for ETL pipeline
 COPY data_raw/ ./data_raw/
 
 # Create data directory
-RUN mkdir -p /app/data
+RUN mkdir -p data
 
 # Copy built frontend from Stage 1
 COPY --from=frontend-build /app/frontend/dist ./frontend/dist
@@ -47,7 +47,7 @@ RUN mkdir -p frontend/dist/data && \
     cp data_raw/Provincias.json frontend/dist/data/provincias_simplified.json && \
     cp data_raw/comunas.json frontend/dist/data/comunas_simplified.json
 
-# Copy PMTiles from frontend public to dist (if present in git)
+# Copy PMTiles from frontend public to dist
 COPY frontend/public/data/ /tmp/public_data/
 RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/public_data
 
@@ -57,5 +57,5 @@ ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 
 EXPOSE 8000
 
-# Use Python startup script (avoids CRLF issues with .sh scripts)
-CMD ["python", "/app/startup.py"]
+# Start with Python startup script (same pattern as the working deployment)
+CMD cd /app && python startup.py
