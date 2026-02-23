@@ -1,0 +1,243 @@
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from pydantic import BaseModel
+from typing import Dict, Any, List
+import json
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from shapely.geometry import shape
+from shapely import wkt
+import geopandas as gpd
+import pandas as pd
+import tempfile
+import os
+import shutil
+import fiona
+
+# Habilitar soporte para KML en fiona (GeoPandas lo utiliza internamente)
+fiona.drvsupport.supported_drivers['KML'] = 'rw'
+fiona.drvsupport.supported_drivers['LIBKML'] = 'rw'
+
+# Configurar logs
+import logging
+logging.basicConfig(level=logging.INFO)
+
+# Importar configuración de BD
+from database import get_db_connection, DATABASE_PATH
+
+app = FastAPI(title="Geoportal Chile API", version="1.0.0")
+
+# Limitamos hilos concurrentes
+# En modo WAL, las lecturas en SQLite pueden ser concurrentes sin bloqueos severos
+executor = ThreadPoolExecutor(max_workers=5)
+
+class GeoJSONPayload(BaseModel):
+    type: str
+    geometry: Dict[str, Any]
+    properties: Dict[str, Any] = None
+
+def run_spatial_query(query: str, parameters: tuple = ()) -> List[dict]:
+    """Ejecuta consulta sobre SQLite síncronamente en un hilo."""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(query, parameters)
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]
+    except Exception as e:
+        logging.error(f"Error executing query: {query}. Error: {e}")
+        return []
+    finally:
+        conn.close()
+
+def run_gpd_intersection(layer: str, geom_wkt: str) -> List[dict]:
+    """Busca intersecciones contra una capa usando GeoPandas y bbox (índice espacial GDAL)."""
+    try:
+        geom = wkt.loads(geom_wkt)
+        # Usamos bbox para que Fiona use el índice espacial R-Tree internamente de forma rápida
+        gdf = gpd.read_file(DATABASE_PATH, layer=layer, bbox=geom.bounds)
+        if gdf.empty:
+            return []
+        
+        # Refinar intersección exacta en memoria
+        intersecting = gdf[gdf.intersects(geom)].copy()
+        if intersecting.empty:
+            return []
+            
+        # Calcular area de la interseccion (en Ha)
+        try:
+            intersections_geom_proj = intersecting.intersection(geom).to_crs(epsg=32719)
+            intersecting['area_interseccion_ha'] = intersections_geom_proj.area / 10000.0
+        except Exception as e:
+            logging.error(f"Error calculando area interseccion en {layer}: {e}")
+            intersecting['area_interseccion_ha'] = 0.0
+            
+        intersecting = intersecting.drop(columns=['geometry', 'GEOMETRY'], errors='ignore')
+        # Limpiar NaNs para que FastAPI pueda serializar a JSON correctamente
+        intersecting = intersecting.where(pd.notnull(intersecting), None)
+        return intersecting.to_dict('records')
+    except Exception as e:
+        logging.error(f"Error en capa {layer}: {e}")
+        return []
+
+def run_gpd_area(geom_wkt: str) -> float:
+    """Calcula el área reproyectando a UTM 19S (EPSG:32719) en memoria con GeoPandas"""
+    try:
+        geom = wkt.loads(geom_wkt)
+        gdf = gpd.GeoDataFrame(geometry=[geom], crs="EPSG:4326")
+        gdf_proj = gdf.to_crs(epsg=32719)
+        return float(gdf_proj.area.iloc[0] / 10000.0)
+    except Exception as e:
+        logging.error(f"Error calculating area: {e}")
+        return 0.0
+
+async def check_layer_intersection(layer: str, geom_wkt: str) -> List[dict]:
+    """Busca intersecciones de manera asíncrona delegando a hilo."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(executor, run_gpd_intersection, layer, geom_wkt)
+
+@app.post("/api/reporte-predio")
+async def reporte_predio(payload: GeoJSONPayload):
+    try:
+        geom = shape(payload.geometry)
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+            
+        wkt = geom.wkt
+        
+        # Ejecución asíncrona y simultánea (Micro/Web)
+        capas_afectacion = ["sitios_prioritarios", "pertenencias_mineras", "concesiones_acuicultura", "ecmpo", "areas_marinas", "areas_protegidas", "ecosistemas"]
+        tareas = [check_layer_intersection(capa, wkt) for capa in capas_afectacion]
+        
+        # Esperamos a que todas las queries terminen en paralelo
+        resultados = await asyncio.gather(*tareas)
+        
+        restricciones = {}
+        for capa, res in zip(capas_afectacion, resultados):
+            # Limpiamos el objeto GEOMETRY WKB en la salida JSON ya que no es serializable
+            res_limpio = [{k: v for k, v in dict_item.items() if k != 'GEOMETRY'} for dict_item in res]
+            restricciones[capa] = res_limpio
+            
+        # Consulta de DPA (División Político Administrativa)
+        dpa_capas = ["regiones", "provincias", "comunas"]
+        dpa_tareas = [check_layer_intersection(capa, wkt) for capa in dpa_capas]
+        dpa_resultados = await asyncio.gather(*dpa_tareas)
+        
+        dpa_info = {"Region": [], "Provincia": [], "Comuna": []}
+        
+        def fix_encoding(text):
+            if not isinstance(text, str): return text
+            try:
+                # Arreglo para mojibake "RegiÃ³n" -> "Región"
+                return text.encode('latin-1').decode('utf-8')
+            except:
+                return text
+
+        if dpa_resultados[0]:
+            dpa_info["Region"] = list(set([fix_encoding(item.get('region')) for item in dpa_resultados[0] if item.get('region')]))
+        if dpa_resultados[1]:
+            dpa_info["Provincia"] = list(set([fix_encoding(item.get('provincia')) for item in dpa_resultados[1] if item.get('provincia')]))
+        if dpa_resultados[2]:
+            dpa_info["Comuna"] = list(set([fix_encoding(item.get('comuna')) for item in dpa_resultados[2] if item.get('comuna')]))
+        
+        # Inyectando el cálculo de área con GeoPandas (cross-platform robusto)
+        loop = asyncio.get_event_loop()
+        area_ha = await loop.run_in_executor(executor, run_gpd_area, wkt)
+        
+        return {
+            "estado": "exito",
+            "area_total_ha": round(area_ha, 2) if area_ha else 0.0,
+            "dpa": dpa_info,
+            "restricciones": restricciones
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/upload-predio")
+async def upload_predio(file: UploadFile = File(...)):
+    """ Endpoint para procesar archivos espaciales subidos por el usuario (SHP zip, KML, GeoJSON) """
+    try:
+        suffix = os.path.splitext(file.filename)[1].lower()
+        if suffix not in ['.zip', '.geojson', '.json', '.kml']:
+            suffix = '.tmp'
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            tmp_path = tmp.name
+        
+        loop = asyncio.get_event_loop()
+        
+        def process_file_sync(path):
+            read_path = path
+            if path.endswith('.zip'):
+                read_path = f"zip://{path}"
+            
+            gdf = gpd.read_file(read_path)
+            
+            # Limpiar geometrias vacias
+            gdf = gdf.dropna(subset=['geometry'])
+            if gdf.empty:
+                raise ValueError("El archivo no contenía geometrías válidas.")
+            
+            # Reproyectar a WGS84 (EPSG:4326) de ser necesario
+            if gdf.crs is None or gdf.crs.to_string() != 'EPSG:4326':
+                if gdf.crs is None:
+                    # Asumimos WGS84 si viene sin CRS (común en geojsons puros)
+                    gdf.set_crs(epsg=4326, inplace=True, allow_override=True)
+                else:
+                    gdf = gdf.to_crs(epsg=4326)
+
+            # Convertir el DataFrame directamente en un JSON tipo FeatureCollection
+            return json.loads(gdf.to_json())
+            
+        feature_collection = await loop.run_in_executor(executor, process_file_sync, tmp_path)
+        
+        os.remove(tmp_path)
+        return feature_collection
+
+    except Exception as e:
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.remove(tmp_path)
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=400, detail=f"Error leyendo el archivo espacial: {str(e)}")
+
+@app.get("/api/stats/region/{id_region}")
+async def stats_region(id_region: str):
+    """Consulta Macro desde la Web"""
+    query = """
+        SELECT c.* 
+        FROM pertenencias_mineras c
+        JOIN division_politica dp ON ST_Intersects(c.GEOMETRY, dp.GEOMETRY)
+        WHERE dp.region LIKE '%' || ? || '%'
+    """
+    loop = asyncio.get_event_loop()
+    res = await loop.run_in_executor(executor, run_spatial_query, query, (id_region,))
+    return {
+        "region": id_region,
+        "conteo_pertenencias": len(res)
+    }
+
+# Servir Frontend
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# Permitir CORS para desarrollo con Vite
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
+if os.path.exists(frontend_dir):
+    app.mount("/static", StaticFiles(directory=frontend_dir), name="frontend")
+
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/static/index.html")

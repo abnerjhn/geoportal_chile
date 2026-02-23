@@ -1,0 +1,47 @@
+# =============================================
+# Geoportal Chile - .gitignore
+# =============================================
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+venv/
+.venv/
+env/
+*.whl
+
+# ---------- Node / Frontend ----------
+node_modules/
+frontend/dist/
+frontend/.cache/
+.vite/
+
+# ---------- Datos pesados ----------
+# La DB SpatiaLite se genera con el pipeline ETL
+data/*.sqlite
+data/*.db
+
+# GeoJSON pesados del frontend (se copian desde data_raw)
+frontend/public/data/*.json
+
+# ---------- IDE / OS ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+
+# ---------- Logs / Debug ----------
+*.log
+*.txt
+!requirements.txt
+!README.md
+
+# ---------- Temp ----------
+*.tmp
+*.bak
