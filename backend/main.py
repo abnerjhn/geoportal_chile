@@ -54,6 +54,12 @@ async def health():
             except:
                 info["spatialite"] = False
             conn.close()
+        
+        # Intentar leer log del ETL
+        log_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist', 'etl_log.txt'))
+        if os.path.exists(log_path):
+            with open(log_path, 'r', encoding='utf-8') as f:
+                info["etl_log_tail"] = f.read()[-2000:]
     except Exception as e:
         info["error"] = str(e)
     return info
