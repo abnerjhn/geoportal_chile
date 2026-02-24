@@ -101,6 +101,28 @@ def process_and_export():
 
             gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
             print(f"    OK")
+            
+            # EXPORTAR TAMBIÉN A GEOJSON PARA EL MAPA (solo si es necesario para el frontend)
+            # Definir destino en frontend/public/data/
+            map_data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend', 'public', 'data'))
+            os.makedirs(map_data_dir, exist_ok=True)
+            
+            if name in ["concesiones_mineras_const", "concesiones_mineras_tramite"]:
+                json_output = os.path.join(map_data_dir, f"{name}.json")
+                print(f"    Simplificando para el mapa y guardando en {json_output}...")
+                # Una simplificación muy leve para no perder precisión pero bajar peso
+                # 0.0001 es aprox 10 metros, suficiente para visualización rápida
+                gdf_simple = gdf.copy()
+                gdf_simple.geometry = gdf_simple.geometry.simplify(0.0001, preserve_topology=True)
+                # Solo exportamos columnas básicas para el mapa para ahorrar ancho de banda
+                # NOMBRE, SITUACION, TIPO_CONCE, TITULAR_NO, ORIGEN
+                cols_mapa = ['nombre', 'situacion', 'tipo_conce', 'titular_no', 'origen', 'geometry']
+                # Filtrar solo si existen
+                cols_existentes = [c for c in cols_mapa if c in gdf_simple.columns or c == 'geometry']
+                gdf_simple[cols_existentes].to_file(json_output, driver='GeoJSON')
+                print(f"    JSON del mapa OK")
+                del gdf_simple
+            
             del gdf # IMPORTANTE: Liberar memoria
         except Exception as e:
             print(f"    ERROR en {name}: {e}")
