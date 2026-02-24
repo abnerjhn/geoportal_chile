@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v10-mvt-architecture-upgrade"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V10_2026-02-24T00-10-00"
+        info["deploy_id"] = "v11-mvt-rendering-and-color-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V11_2026-02-24T00-25-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -309,9 +309,9 @@ async def get_tile(layer: str, z: int, x: int, y: int):
             ST_AsMVTGeom(
                 ST_Transform(t.GEOMETRY, 3857), 
                 (SELECT geom FROM bounds),
-                4096, 0, false
+                4096, 64, true
             ) AS geom,
-            t.*
+            t.nombre, t.situacion, t.tipo_conce, t.titular_no
         FROM "{layer}" t
         WHERE t.ROWID IN (
             SELECT rowid FROM SpatialIndex 

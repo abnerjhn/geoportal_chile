@@ -214,7 +214,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         type: 'fill',
                         source: 'concesiones_mineras_tramite',
                         'source-layer': 'concesiones_mineras_tramite',
-                        paint: { 'fill-color': '#ea580c', 'fill-opacity': 0.2 },
+                        paint: { 'fill-color': '#8b5cf6', 'fill-opacity': 0.2 },
                         layout: { visibility: activeLayers?.concesiones_mineras_tramite ? 'visible' : 'none' }
                     },
                     {
@@ -222,7 +222,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         type: 'line',
                         source: 'concesiones_mineras_tramite',
                         'source-layer': 'concesiones_mineras_tramite',
-                        paint: { 'line-color': '#c2410c', 'line-width': 1.5 },
+                        paint: { 'line-color': '#7c3aed', 'line-width': 1.5 },
                         layout: { visibility: activeLayers?.concesiones_mineras_tramite ? 'visible' : 'none' }
                     },
 

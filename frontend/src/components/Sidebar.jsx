@@ -59,7 +59,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
         provincias: "bg-teal-500",
         comunas: "bg-orange-500",
         concesiones_mineras_const: "bg-amber-600",
-        concesiones_mineras_tramite: "bg-orange-600"
+        concesiones_mineras_tramite: "bg-violet-600"
     };
 
     const [showDownloadMenu, setShowDownloadMenu] = React.useState(false);
@@ -418,7 +418,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                             if (miningAreaTramite > 0) {
                                 chartLabels.push("C.M. en Trámite");
                                 chartData.push(Number(miningAreaTramite.toFixed(2)));
-                                bgColors.push('#ea580c'); // orange-600
+                                bgColors.push('#8b5cf6'); // violet-500
                             }
 
                             if (freeArea > 0 || chartData.length === 0) {
