@@ -139,6 +139,26 @@ def load_layers():
     return layers
 
 def process_and_export():
+    # Caminno para el log que podremos ver desde la web
+    log_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend', 'dist', 'etl_log.txt'))
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    
+    import sys
+    class Logger:
+        def __init__(self, filename):
+            self.terminal = sys.stdout
+            self.log = open(filename, "a", encoding="utf-8")
+        def write(self, message):
+            self.terminal.write(message)
+            self.log.write(message)
+            self.log.flush()
+        def flush(self):
+            self.terminal.flush()
+            self.log.flush()
+
+    sys.stdout = Logger(log_path)
+    sys.stderr = sys.stdout
+
     print("Iniciando ETL con datos reales (GeoPandas)...")
     layers = load_layers()
         
