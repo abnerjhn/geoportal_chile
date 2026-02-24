@@ -53,10 +53,10 @@ RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/p
 
 # Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw
-ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
+ENV DATABASE_PATH=/app/data/chile_v2.sqlite
 
-# Run ETL pipeline at BUILD TIME to bake the database into the image
-RUN python etl/pipeline_chile.py && \
-    ls -la /app/data/chile_territorial.sqlite
+# Run ETL pipeline at BUILD TIME with explicit failure and logging
+RUN python etl/pipeline_chile.py || (cat frontend/dist/etl_log.txt && exit 1) && \
+    sqlite3 data/chile_v2.sqlite "SELECT name FROM sqlite_master WHERE type='table' AND name='ecosistemas';" | grep ecosistemas
 
 EXPOSE 8000
