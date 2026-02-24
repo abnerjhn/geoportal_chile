@@ -181,22 +181,6 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.2 },
                         layout: { visibility: 'none' }
                     },
-                    {
-                        id: 'concesiones_mineras_const-fill',
-                        type: 'fill',
-                        source: 'concesiones_mineras_const',
-                        'source-layer': 'concesion_minera_CONSTITUIDA',
-                        paint: { 'fill-color': '#d97706', 'fill-opacity': 0.4 },
-                        layout: { visibility: 'none' }
-                    },
-                    {
-                        id: 'concesiones_mineras_tramite-fill',
-                        type: 'fill',
-                        source: 'concesiones_mineras_tramite',
-                        'source-layer': 'concesion_minera_EN_TRAMITE',
-                        paint: { 'fill-color': '#ea580c', 'fill-opacity': 0.4 },
-                        layout: { visibility: 'none' }
-                    },
 
                     {
                         id: 'terrenos-fill',

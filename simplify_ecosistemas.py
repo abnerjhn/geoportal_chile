@@ -6,10 +6,9 @@ output_path = 'd:/web_D_anctigravity/sig_chile/geoportal_chile/data_raw/Ecosiste
 
 print(f"Loading {input_path}...")
 gdf = gpd.read_file(input_path)
-print(f"Loaded {len(gdf)} features. Clipping to 1000 for DEBUG.")
+print(f"Loaded {len(gdf)} features.")
 
-# Clip to 1000 (Removed for Production)
-# gdf = gdf.head(1000)
+# Mantener solo columnas necesarias
 
 # Mantener solo columnas necesarias
 gdf.columns = [c.lower() for c in gdf.columns]

@@ -74,19 +74,29 @@ def process_and_export():
         try:
             gdf = gpd.read_file(path)
             
-            # Normalizar columnas a minúsculas
-            gdf.columns = [c.lower() for c in gdf.columns]
+            # Normalizar columnas a minúsculas y limpiar nombres problemáticos
+            gdf.columns = [str(c).lower() for c in gdf.columns]
             
-            # Garantizar que las geometrías sean válidas
-            print(f"    Reparando geometrías...")
-            gdf['geometry'] = gdf['geometry'].buffer(0)
-            
-            # Prevenir problemas de tipos antes de exportar
-            print(f"    Exportando {len(gdf)} filas...")
+            # Quitar columnas duplicadas o con nombres reservados/nulos
+            gdf = gdf.loc[:, ~gdf.columns.duplicated()]
+            cols_to_drop = [c for c in gdf.columns if c in ['nan', 'none', 'null', '', 'unnamed: 0']]
+            if cols_to_drop:
+                print(f"    INFO: Eliminando columnas {cols_to_drop}")
+                gdf = gdf.drop(columns=cols_to_drop)
+
+            # Reparar geometrías
+            print("    Reparando geometrías...")
+            gdf.geometry = gdf.geometry.buffer(0)
+            gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
+
+            # Limpiar NaNs para evitar errores de exportación ('nan' error)
             for col in gdf.columns:
                 if col != 'geometry':
-                    if pd.api.types.is_string_dtype(gdf[col]) or pd.api.types.is_object_dtype(gdf[col]):
-                        gdf[col] = gdf[col].astype(object)
+                    # Convertir a string y llenar nulos
+                    gdf[col] = gdf[col].fillna('').astype(str)
+
+            # Prevenir problemas de tipos antes de exportar
+            print(f"    Exportando {len(gdf)} filas...")
 
             gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
             print(f"    OK")
