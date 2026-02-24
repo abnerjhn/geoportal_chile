@@ -181,6 +181,22 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.2 },
                         layout: { visibility: 'none' }
                     },
+                    {
+                        id: 'concesiones_mineras_const-fill',
+                        type: 'fill',
+                        source: 'concesiones_mineras_const',
+                        'source-layer': 'concesion_minera_CONSTITUIDA',
+                        paint: { 'fill-color': '#d97706', 'fill-opacity': 0.4 },
+                        layout: { visibility: 'none' }
+                    },
+                    {
+                        id: 'concesiones_mineras_tramite-fill',
+                        type: 'fill',
+                        source: 'concesiones_mineras_tramite',
+                        'source-layer': 'concesion_minera_EN_TRAMITE',
+                        paint: { 'fill-color': '#ea580c', 'fill-opacity': 0.4 },
+                        layout: { visibility: 'none' }
+                    },
 
                     {
                         id: 'terrenos-fill',
@@ -248,52 +264,71 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
             const geojsonSources = {
                 'concesiones': '/static/data/concesiones.json',
                 'ecmpo': '/static/data/ecmpo.json',
+                'concesiones_mineras_const': '/static/data/concesion_minera_CONSTITUIDA.json',
+                'concesiones_mineras_tramite': '/static/data/concesion_minera_EN_TRAMITE.json',
                 'regiones': '/static/data/regiones_simplified.json',
                 'provincias': '/static/data/provincias_simplified.json',
                 'comunas': '/static/data/comunas_simplified.json'
             };
-            const layerDefs = [
-                { id: 'concesiones-fill', type: 'fill', source: 'concesiones', paint: { 'fill-color': '#06b6d4', 'fill-opacity': 0.2 }, vis: activeLayers?.concesiones },
-                { id: 'concesiones-line', type: 'line', source: 'concesiones', paint: { 'line-color': '#0891b2', 'line-width': 1.5 }, vis: activeLayers?.concesiones },
-                { id: 'ecmpo-fill', type: 'fill', source: 'ecmpo', paint: { 'fill-color': '#f43f5e', 'fill-opacity': 0.2 }, vis: activeLayers?.ecmpo },
-                { id: 'ecmpo-line', type: 'line', source: 'ecmpo', paint: { 'line-color': '#e11d48', 'line-width': 1.5 }, vis: activeLayers?.ecmpo },
-                { id: 'regiones-fill', type: 'fill', source: 'regiones', paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.1 }, vis: activeLayers?.regiones },
-                { id: 'regiones-line', type: 'line', source: 'regiones', paint: { 'line-color': '#4f46e5', 'line-width': 2 }, vis: activeLayers?.regiones },
-                { id: 'provincias-fill', type: 'fill', source: 'provincias', paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.1 }, vis: activeLayers?.provincias },
-                { id: 'provincias-line', type: 'line', source: 'provincias', paint: { 'line-color': '#0d9488', 'line-width': 1.5 }, vis: activeLayers?.provincias },
-                { id: 'comunas-fill', type: 'fill', source: 'comunas', paint: { 'fill-color': '#f97316', 'fill-opacity': 0.1 }, vis: activeLayers?.comunas },
-                { id: 'comunas-line', type: 'line', source: 'comunas', paint: { 'line-color': '#ea580c', 'line-width': 1 }, vis: activeLayers?.comunas },
-            ];
-            // Add sources
-            Object.entries(geojsonSources).forEach(([name, url]) => {
-                if (!map.current.getSource(name)) {
-                    map.current.addSource(name, { type: 'geojson', data: url });
+
+            const borderColors = {
+                'concesiones': '#0891b2',
+                'ecmpo': '#e11d48',
+                'concesiones_mineras_const': '#b45309',
+                'concesiones_mineras_tramite': '#c2410c',
+                'regiones': '#4f46e5',
+                'provincias': '#0d9488',
+                'comunas': '#ea580c'
+            };
+
+            // Add sources and layers dynamically
+            Object.entries(geojsonSources).forEach(([id, url]) => {
+                if (!map.current.getSource(id)) {
+                    map.current.addSource(id, { type: 'geojson', data: url });
                 }
-            });
-            // Add layers (before terrenos layers so terrenos stay on top)
-            layerDefs.forEach(def => {
-                if (!map.current.getLayer(def.id)) {
+
+                const colorMap = {
+                    'concesiones': '#06b6d4',
+                    'ecmpo': '#f43f5e',
+                    'concesiones_mineras_const': '#d97706',
+                    'concesiones_mineras_tramite': '#ea580c',
+                    'regiones': '#6366f1',
+                    'provincias': '#14b8a6',
+                    'comunas': '#f97316'
+                };
+                const fillColor = colorMap[id] || '#cccccc'; // Default color
+                const linePaintColor = borderColors[id] || fillColor;
+
+                // Add fill layer
+                if (!map.current.getLayer(`${id}-fill`)) {
                     map.current.addLayer({
-                        id: def.id,
-                        type: def.type,
-                        source: def.source,
-                        paint: def.paint,
-                        layout: { visibility: def.vis ? 'visible' : 'none' }
-                    }, 'terrenos-fill');
+                        id: `${id}-fill`,
+                        type: 'fill',
+                        source: id,
+                        paint: { 'fill-color': fillColor, 'fill-opacity': 0.2 },
+                        layout: { visibility: activeLayers?.[id] ? 'visible' : 'none' }
+                    }, 'terrenos-fill'); // Add before terrenos-fill to keep terrenos on top
+                }
+
+                // Add line layer
+                if (!map.current.getLayer(`${id}-line`)) {
+                    map.current.addLayer({
+                        id: `${id}-line`,
+                        type: 'line',
+                        source: id,
+                        paint: { 'line-color': linePaintColor, 'line-width': 1.5 },
+                        layout: { visibility: activeLayers?.[id] ? 'visible' : 'none' }
+                    }, 'terrenos-fill'); // Add before terrenos-fill
                 }
             });
         });
 
         // Add popups for map features
         const clickableLayers = [
-            'areas_protegidas-fill',
-            'sitios_prioritarios-fill',
-            'ecosistemas-fill',
-            'concesiones-fill',
-            'ecmpo-fill',
-            'regiones-fill',
-            'provincias-fill',
-            'comunas-fill',
+            'areas_protegidas-fill', 'sitios_prioritarios-fill', 'ecosistemas-fill',
+            'concesiones-fill', 'ecmpo-fill',
+            'concesiones_mineras_const-fill', 'concesiones_mineras_tramite-fill',
+            'regiones-fill', 'provincias-fill', 'comunas-fill',
             'terrenos-fill'
         ];
 
@@ -413,10 +448,11 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         const spArea = sumArea(r.restricciones?.sitios_prioritarios);
                         const apArea = sumArea(r.restricciones?.areas_protegidas);
                         const acuArea = sumArea(r.restricciones?.concesiones_acuicultura);
-                        const ecmpoArea = sumArea(r.restricciones?.ecmpo);
+                        const miningAreaConst = sumArea(r.restricciones?.concesiones_mineras_const);
+                        const miningAreaTramite = sumArea(r.restricciones?.concesiones_mineras_tramite);
                         const totalArea = r.area_total_ha || 0;
 
-                        const restrictionsAreaSum = Math.min(totalArea, spArea + apArea + acuArea + ecmpoArea);
+                        const restrictionsAreaSum = Math.min(totalArea, spArea + apArea + acuArea + ecmpoArea + miningAreaConst + miningAreaTramite);
                         const hasRestrictionsFlag = restrictionsAreaSum > 0;
                         const percentRestricted = totalArea > 0 ? (restrictionsAreaSum / totalArea) * 100 : 0;
 

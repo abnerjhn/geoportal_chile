@@ -58,6 +58,8 @@ def process_and_export():
         ("comunas", os.path.join(DPA_DIR, 'comunas.json')),
         ("concesiones_acuicultura", os.path.join(DPA_DIR, 'Concesiones_Acuicultura_geo.json')),
         ("ecmpo", os.path.join(DPA_DIR, 'ECMPO_geo.json')),
+        ("concesiones_mineras_const", os.path.join(DATA_RAW_DIR, 'concesion_minera_CONSTITUIDA.json')),
+        ("concesiones_mineras_tramite", os.path.join(DATA_RAW_DIR, 'concesion_minera_EN_TRAMITE.json')),
     ]
 
     driver = 'SQLite'

@@ -43,7 +43,9 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
         terrenos: "Terrenos Analizados",
         regiones: "Límites Regionales",
         provincias: "Límites Provinciales",
-        comunas: "Límites Comunales"
+        comunas: "Límites Comunales",
+        concesiones_mineras_const: "Catastro Minero Constituidas",
+        concesiones_mineras_tramite: "Catastro Minero en Trámite"
     };
 
     const layerColors = {
@@ -55,7 +57,9 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
         terrenos: "bg-emerald-500",
         regiones: "bg-indigo-500",
         provincias: "bg-teal-500",
-        comunas: "bg-orange-500"
+        comunas: "bg-orange-500",
+        concesiones_mineras_const: "bg-amber-600",
+        concesiones_mineras_tramite: "bg-orange-600"
     };
 
     const [showDownloadMenu, setShowDownloadMenu] = React.useState(false);
@@ -375,9 +379,11 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                             const apArea = sumArea(resItem.restricciones?.areas_protegidas);
                             const acuArea = sumArea(resItem.restricciones?.concesiones_acuicultura);
                             const ecmpoArea = sumArea(resItem.restricciones?.ecmpo);
+                            const miningAreaConst = sumArea(resItem.restricciones?.concesiones_mineras_const);
+                            const miningAreaTramite = sumArea(resItem.restricciones?.concesiones_mineras_tramite);
                             const totalArea = resItem.area_total_ha || 0;
 
-                            const restrictionsAreaSum = Math.min(totalArea, spArea + apArea + acuArea + ecmpoArea);
+                            const restrictionsAreaSum = Math.min(totalArea, spArea + apArea + acuArea + ecmpoArea + miningAreaConst + miningAreaTramite);
                             const freeArea = Math.max(0, totalArea - restrictionsAreaSum);
 
                             const chartLabels = [];
@@ -404,6 +410,16 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                                 chartData.push(Number(ecmpoArea.toFixed(2)));
                                 bgColors.push('#f43f5e'); // rose-500
                             }
+                            if (miningAreaConst > 0) {
+                                chartLabels.push("C.M. Constituidas");
+                                chartData.push(Number(miningAreaConst.toFixed(2)));
+                                bgColors.push('#d97706'); // amber-600
+                            }
+                            if (miningAreaTramite > 0) {
+                                chartLabels.push("C.M. en Trámite");
+                                chartData.push(Number(miningAreaTramite.toFixed(2)));
+                                bgColors.push('#ea580c'); // orange-600
+                            }
 
                             if (freeArea > 0 || chartData.length === 0) {
                                 chartLabels.push("Sin Restricciones");
@@ -416,7 +432,13 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                                 datasets: [{ data: chartData, backgroundColor: bgColors, borderWidth: 1, borderColor: '#0f172a' }]
                             };
 
-                            const hasRestrictionsFlag = resItem.restricciones?.sitios_prioritarios?.length > 0 || resItem.restricciones?.areas_protegidas?.length > 0 || resItem.restricciones?.concesiones_acuicultura?.length > 0 || resItem.restricciones?.ecmpo?.length > 0;
+                            const hasRestrictionsFlag =
+                                resItem.restricciones?.sitios_prioritarios?.length > 0 ||
+                                resItem.restricciones?.areas_protegidas?.length > 0 ||
+                                resItem.restricciones?.concesiones_acuicultura?.length > 0 ||
+                                resItem.restricciones?.ecmpo?.length > 0 ||
+                                resItem.restricciones?.concesiones_mineras_const?.length > 0 ||
+                                resItem.restricciones?.concesiones_mineras_tramite?.length > 0;
 
                             return (
                                 <div key={idx} className="border border-slate-700/50 rounded-lg overflow-hidden bg-slate-800/30">
@@ -537,6 +559,40 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                                                                 <span className="block font-semibold text-slate-300 mb-1">{ec.REP_SUBPES || ec.rep_subpes || "ECMPO"}</span>
                                                                 <span className="block text-slate-500">🏘️ Organización: {ec.REP_SUBP_1 || ec.rep_subp_1 || 'No Definida'}</span>
                                                                 <span className="block text-rose-300 mt-1">Afectación: {formatNumber(ec.area_interseccion_ha)} ha ({formatNumber(totalArea > 0 ? ((ec.area_interseccion_ha || 0) / totalArea) * 100 : 0, 1)}%)</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {resItem.restricciones?.concesiones_mineras_const?.length > 0 && (
+                                                    <div className="bg-amber-900/20 border border-amber-800/30 p-4 rounded-lg flex flex-col gap-2">
+                                                        <div className="flex gap-3 items-center">
+                                                            <span className="text-xl">⛏️</span>
+                                                            <span className="text-amber-500 text-sm font-medium">Inters. con {resItem.restricciones.concesiones_mineras_const.length} Conc. Minera(s) Constituidas</span>
+                                                        </div>
+                                                        {resItem.restricciones.concesiones_mineras_const.map((cm, i) => (
+                                                            <div key={i} className="text-xs text-slate-400 bg-slate-950/50 p-2 rounded mt-1 border border-slate-800/50">
+                                                                <span className="block font-semibold text-slate-300 mb-1">{cm.NOMBRE || cm.nombre || "Concesión Minera"}</span>
+                                                                <span className="block text-slate-500">📊 Situación: {cm.SITUACION || 'Constituida'} • Tipo: {cm.TIPO_CONCE || 'N/A'}</span>
+                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || 'No Definido'}</span>
+                                                                <span className="block text-amber-300 mt-1">Afectación: {formatNumber(cm.area_interseccion_ha)} ha ({formatNumber(totalArea > 0 ? ((cm.area_interseccion_ha || 0) / totalArea) * 100 : 0, 1)}%)</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {resItem.restricciones?.concesiones_mineras_tramite?.length > 0 && (
+                                                    <div className="bg-orange-900/20 border border-orange-800/30 p-4 rounded-lg flex flex-col gap-2">
+                                                        <div className="flex gap-3 items-center">
+                                                            <span className="text-xl">🛠️</span>
+                                                            <span className="text-orange-500 text-sm font-medium">Inters. con {resItem.restricciones.concesiones_mineras_tramite.length} Conc. Minera(s) en Trámite</span>
+                                                        </div>
+                                                        {resItem.restricciones.concesiones_mineras_tramite.map((cm, i) => (
+                                                            <div key={i} className="text-xs text-slate-400 bg-slate-950/50 p-2 rounded mt-1 border border-slate-800/50">
+                                                                <span className="block font-semibold text-slate-300 mb-1">{cm.NOMBRE || cm.nombre || "Concesión Minera"}</span>
+                                                                <span className="block text-slate-500">⏳ Situación: {cm.SITUACION || 'En Trámite'} • Tipo: {cm.TIPO_CONCE || 'N/A'}</span>
+                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || 'No Definido'}</span>
+                                                                <span className="block text-orange-300 mt-1">Afectación: {formatNumber(cm.area_interseccion_ha)} ha ({formatNumber(totalArea > 0 ? ((cm.area_interseccion_ha || 0) / totalArea) * 100 : 0, 1)}%)</span>
                                                             </div>
                                                         ))}
                                                     </div>

@@ -147,7 +147,11 @@ async def reporte_predio(payload: GeoJSONPayload):
         wkt = geom.wkt
         
         # Ejecución asíncrona y simultánea (Micro/Web)
-        capas_afectacion = ["sitios_prioritarios", "pertenencias_mineras", "concesiones_acuicultura", "ecmpo", "areas_marinas", "areas_protegidas", "ecosistemas"]
+        capas_afectacion = [
+            "sitios_prioritarios", "pertenencias_mineras", "concesiones_acuicultura", 
+            "ecmpo", "areas_marinas", "areas_protegidas", "ecosistemas",
+            "concesiones_mineras_const", "concesiones_mineras_tramite"
+        ]
         tareas = [check_layer_intersection(capa, wkt) for capa in capas_afectacion]
         
         # Esperamos a que todas las queries terminen en paralelo
