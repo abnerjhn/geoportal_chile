@@ -1,0 +1,14 @@
+.git
+.gitignore
+venv
+*.pyc
+__pycache__
+frontend/node_modules
+.gemini
+data/*.sqlite
+data/*.db
+!data/.keep
+!data_raw/*.json
+!data_raw/*.zip
+!data_raw/*.kml
+!data_raw/*.geojson
