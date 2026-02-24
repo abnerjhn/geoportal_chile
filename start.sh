@@ -4,7 +4,7 @@ set -e
 echo "=== Geoportal Chile - Startup ==="
 
 # Run ETL pipeline to generate SQLite database (if not already present)
-if [ ! -f /app/data/chile_territorial.sqlite ]; then
+if [ ! -f /app/data/chile_v2.sqlite ]; then
     echo "Generating SQLite database from raw data..."
     cd /app
     python etl/pipeline_chile.py || echo "WARNING: ETL failed, server will start without full data"

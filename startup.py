@@ -9,7 +9,7 @@ import subprocess
 def main():
     print("=== Geoportal Chile Startup ===", flush=True)
     
-    db_path = os.environ.get('DATABASE_PATH', '/app/data/chile_territorial.sqlite')
+    db_path = os.environ.get('DATABASE_PATH', '/app/data/chile_v2.sqlite')
     print(f"[STARTUP] Database path: {db_path}", flush=True)
     print(f"[STARTUP] Database exists: {os.path.exists(db_path)}", flush=True)
     

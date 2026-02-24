@@ -3,7 +3,7 @@ import sqlite3
 
 # Database path: use env var if set, otherwise resolve relative to this file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-_default_db = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+_default_db = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_v2.sqlite'))
 DATABASE_PATH = os.environ.get('DATABASE_PATH', _default_db)
 
 print(f"[DB] Path configured: {DATABASE_PATH}")
