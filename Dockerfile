@@ -58,6 +58,6 @@ ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 # Run ETL pipeline at BUILD TIME to bake the database into the image
 RUN python etl/pipeline_chile.py && \
     ls -la /app/data/chile_territorial.sqlite && \
-    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()"
+    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); tables = [r[0].lower() for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]; print('Tables:', tables); assert 'ecosistemas' in tables, 'Table ecosistemas missing from DB!'"
 
 EXPOSE 8000

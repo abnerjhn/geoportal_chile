@@ -55,10 +55,24 @@ def load_layers():
         }, crs=crs)
 
     # 3. Ecosistemas
+    print(f"DEBUG: Buscando ecosistemas en {DOWNLOADS_DIR}...")
+    # Listar archivos para depuración
+    if os.path.exists(DOWNLOADS_DIR):
+        print(f"DEBUG: Archivos en {DOWNLOADS_DIR}: {os.listdir(DOWNLOADS_DIR)}")
+    
     path_eco = os.path.join(DOWNLOADS_DIR, 'Ecosistemas_multipart.json')
+    if not os.path.exists(path_eco):
+        # Intento alternativo por si acaso
+        import glob
+        matches = glob.glob(os.path.join(DOWNLOADS_DIR, "*cosistema*.json"))
+        if matches:
+            path_eco = matches[0]
+            print(f"DEBUG: Encontrado alternativo: {path_eco}")
+
     if os.path.exists(path_eco):
         print(f"[{path_eco}] Cargando Ecosistemas reales...")
         gdf_eco = gpd.read_file(path_eco)
+        print(f"DEBUG: Ecosistemas cargados: {len(gdf_eco)} filas")
         # Normalizar columnas a minúsculas
         gdf_eco.columns = [c.lower() for c in gdf_eco.columns]
         # Reparar geometrías inválidas
@@ -66,7 +80,7 @@ def load_layers():
         gdf_eco['geometry'] = gdf_eco['geometry'].buffer(0)
         layers["ecosistemas"] = gdf_eco
     else:
-        print(f"WARN: No se encontró {path_eco}")
+        print(f"ERROR: No se encontró el archivo de ecosistemas en {DOWNLOADS_DIR}")
 
     # Mocks for missing ones
     layers["pertenencias_mineras"] = gpd.GeoDataFrame({
