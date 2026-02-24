@@ -124,8 +124,11 @@ def process_and_export():
     print("Iniciando ETL con datos reales (GeoPandas)...")
     layers = load_layers()
         
-    db_path = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+    # Use DATABASE_PATH env var if set, otherwise default to relative path
+    _default = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
+    db_path = os.environ.get('DATABASE_PATH', _default)
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    print(f"Database output path: {db_path}")
     
     if os.path.exists(db_path):
         try:

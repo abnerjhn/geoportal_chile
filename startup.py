@@ -21,8 +21,7 @@ def main():
             result = subprocess.run(
                 [sys.executable, '/app/etl/pipeline_chile.py'],
                 cwd='/app',
-                capture_output=False,
-                timeout=300
+                timeout=600
             )
             if result.returncode != 0:
                 print(f"[STARTUP] WARNING: ETL exited with code {result.returncode}", flush=True)
