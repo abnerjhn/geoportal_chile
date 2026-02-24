@@ -25,15 +25,13 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
 
     React.useEffect(() => {
         fetch('/static/data/formations.json')
-            .then(res => res.json())
+            .then(res => { if (!res.ok) return []; return res.json(); })
             .then(data => {
                 const fMap = {};
-                data.forEach(item => {
-                    fMap[item.codigo] = item;
-                });
+                if (Array.isArray(data)) data.forEach(item => { fMap[item.codigo] = item; });
                 setFormationsMap(fMap);
             })
-            .catch(err => console.error("Error loading formations map:", err));
+            .catch(err => console.warn("formations.json not available:", err));
     }, []);
 
     const layerNames = {

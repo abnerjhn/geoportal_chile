@@ -292,12 +292,33 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
 
         map.current.addControl(new maplibregl.NavigationControl(), 'top-right');
 
-        // Setup MapBox Draw, but hidden displayControls
+        // Custom draw styles to fix line-dasharray incompatibility with MapLibre
+        const drawStyles = [
+            // Polygon fill (active)
+            { id: 'gl-draw-polygon-fill-active', type: 'fill', filter: ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'true']], paint: { 'fill-color': '#10b981', 'fill-opacity': 0.2 } },
+            // Polygon fill (inactive)
+            { id: 'gl-draw-polygon-fill-inactive', type: 'fill', filter: ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'false']], paint: { 'fill-color': '#10b981', 'fill-opacity': 0.1 } },
+            // Polygon stroke (active)
+            { id: 'gl-draw-polygon-stroke-active', type: 'line', filter: ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'true']], paint: { 'line-color': '#10b981', 'line-width': 3 } },
+            // Polygon stroke (inactive)
+            { id: 'gl-draw-polygon-stroke-inactive', type: 'line', filter: ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'false']], paint: { 'line-color': '#10b981', 'line-width': 2 } },
+            // Line (active) - using "literal" for dasharray
+            { id: 'gl-draw-line-active', type: 'line', filter: ['all', ['==', '$type', 'LineString'], ['==', 'active', 'true']], paint: { 'line-color': '#10b981', 'line-width': 3, 'line-dasharray': ["literal", [2, 2]] } },
+            // Line (inactive)
+            { id: 'gl-draw-line-inactive', type: 'line', filter: ['all', ['==', '$type', 'LineString'], ['==', 'active', 'false']], paint: { 'line-color': '#10b981', 'line-width': 2, 'line-dasharray': ["literal", [2, 2]] } },
+            // Vertex point (active)
+            { id: 'gl-draw-point-active', type: 'circle', filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'vertex'], ['==', 'active', 'true']], paint: { 'circle-radius': 6, 'circle-color': '#fff', 'circle-stroke-color': '#10b981', 'circle-stroke-width': 2 } },
+            // Vertex point (inactive)
+            { id: 'gl-draw-point-inactive', type: 'circle', filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'vertex'], ['==', 'active', 'false']], paint: { 'circle-radius': 4, 'circle-color': '#fff', 'circle-stroke-color': '#10b981', 'circle-stroke-width': 2 } },
+            // Midpoint
+            { id: 'gl-draw-polygon-midpoint', type: 'circle', filter: ['all', ['==', '$type', 'Point'], ['==', 'meta', 'midpoint']], paint: { 'circle-radius': 4, 'circle-color': '#10b981' } },
+        ];
+
         draw.current = new MapboxDraw({
             displayControlsDefault: false,
-            // We removed the controls panel from the map container completely
             controls: {},
-            defaultMode: 'simple_select'
+            defaultMode: 'simple_select',
+            styles: drawStyles
         });
 
         map.current.addControl(draw.current, 'top-right');

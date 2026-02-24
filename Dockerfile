@@ -55,7 +55,9 @@ RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/p
 ENV DATA_RAW_DIR=/app/data_raw
 ENV DATABASE_PATH=/app/data/chile_territorial.sqlite
 
-EXPOSE 8000
+# Run ETL pipeline at BUILD TIME to bake the database into the image
+RUN python etl/pipeline_chile.py && \
+    ls -la /app/data/chile_territorial.sqlite && \
+    python -c "import sqlite3; c=sqlite3.connect('/app/data/chile_territorial.sqlite'); print('Tables:', [r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE type='table'\").fetchall()]); c.close()"
 
-# Start with Python startup script (same pattern as the working deployment)
-CMD cd /app && python startup.py
+EXPOSE 8000
