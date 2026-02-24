@@ -361,6 +361,48 @@ async def get_tile(layer: str, z: int, x: int, y: int):
         }
     )
 
+@app.get("/api/debug-tile/{layer}/{z}/{x}/{y}")
+async def debug_tile(layer: str, z: int, x: int, y: int):
+    """Diagnóstico para el error 500 en MVT."""
+    import traceback
+    WORLD_SIZE = 40075016.68557849
+    ORIGIN_X = -20037508.342789244
+    ORIGIN_Y = 20037508.342789244
+    tile_size = WORLD_SIZE / (2**z)
+    xmin = ORIGIN_X + x * tile_size
+    xmax = xmin + tile_size
+    ymax = ORIGIN_Y - y * tile_size
+    ymin = ymax - tile_size
+    
+    debug_info = {"layer": layer, "z": z, "x": x, "y": y}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Info de columnas
+        cursor.execute("SELECT f_geometry_column, srid FROM geometry_columns WHERE f_table_name = ?", (layer,))
+        debug_info["geometry_columns"] = cursor.fetchone()
+        
+        cursor.execute(f"PRAGMA table_info('{layer}')")
+        debug_info["pragma_table_info"] = [dict(r) for r in cursor.fetchall()]
+        
+        # 2. Intentar la query por partes
+        # ... simplificamos para el debug ...
+        geom_col = "geometry" # basándonos en lo visto antes
+        query_test = f"SELECT ST_AsMVTGeom(ST_Transform(\"{geom_col}\", 3857), ST_MakeEnvelope(?,?,?,?,3857)) FROM \"{layer}\" LIMIT 1"
+        try:
+            cursor.execute(query_test, (xmin, ymin, xmax, ymax))
+            debug_info["st_asmvtgeom_test"] = "ok"
+        except Exception as e:
+            debug_info["st_asmvtgeom_error"] = str(e)
+
+        conn.close()
+    except Exception as e:
+        debug_info["error"] = str(e)
+        debug_info["traceback"] = traceback.format_exc()
+        
+    return debug_info
+
 # Servir Frontend
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
