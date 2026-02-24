@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v11-mvt-rendering-and-color-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V11_2026-02-24T00-25-00"
+        info["deploy_id"] = "v12-mvt-schema-aware-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V12_2026-02-24T06-30-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -297,36 +297,49 @@ async def get_tile(layer: str, z: int, x: int, y: int):
     ymax = ORIGIN_Y - y * tile_size
     ymin = ymax - tile_size
     
-    # Consulta robusta con ST_AsMVT
-    # Nota: Transformamos la geometría de la DB (EPSG:4326) a 3857 para el clip y luego MVT
-    query = f"""
-    WITH 
-    bounds AS (
-        SELECT ST_MakeEnvelope(?, ?, ?, ?, 3857) AS geom
-    ),
-    mvt_geom AS (
-        SELECT 
-            ST_AsMVTGeom(
-                ST_Transform(t.GEOMETRY, 3857), 
-                (SELECT geom FROM bounds),
-                4096, 64, true
-            ) AS geom,
-            t.nombre, t.situacion, t.tipo_conce, t.titular_no
-        FROM "{layer}" t
-        WHERE t.ROWID IN (
-            SELECT rowid FROM SpatialIndex 
-            WHERE f_table_name = ? 
-            AND search_frame = ST_Transform((SELECT geom FROM bounds), 4326)
-        )
-    )
-    SELECT ST_AsMVT(mvt_geom.*, ?) FROM mvt_geom;
-    """
-    
     def fetch_tile_sync():
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            # PRAGMA para optimizar MVT
+            
+            # 1. Detectar el nombre de la columna de geometría
+            cursor.execute("SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = ?", (layer,))
+            row_geom = cursor.fetchone()
+            geom_col = row_geom[0] if row_geom else "GEOMETRY"
+
+            # 2. Detectar columnas disponibles para metadata (evitar 500 si falta alguna)
+            cursor.execute(f"PRAGMA table_info('{layer}')")
+            cols = [r[1] for r in cursor.fetchall() if r[1].lower() not in [geom_col.lower(), 'ogc_fid']]
+            # Limitar a columnas útiles para el mapa para no engrosar el tile
+            useful_cols = ['nombre', 'situacion', 'tipo_conce', 'titular_no', 'titular', 'estado', 'tipo', 'piso', 'codigo']
+            cols_to_include = [c for c in cols if c.lower() in useful_cols]
+            cols_str = ", ".join([f't."{c}"' for c in cols_to_include])
+            if cols_str: cols_str = ", " + cols_str
+
+            # 3. Consulta final dinámica
+            query = f"""
+            WITH 
+            bounds AS (
+                SELECT ST_MakeEnvelope(?, ?, ?, ?, 3857) AS geom
+            ),
+            mvt_geom AS (
+                SELECT 
+                    ST_AsMVTGeom(
+                        ST_Transform(t."{geom_col}", 3857), 
+                        (SELECT geom FROM bounds),
+                        4096, 64, true
+                    ) AS geom
+                    {cols_str}
+                FROM "{layer}" t
+                WHERE t.ROWID IN (
+                    SELECT rowid FROM SpatialIndex 
+                    WHERE f_table_name = ? 
+                    AND search_frame = ST_Transform((SELECT geom FROM bounds), 4326)
+                )
+            )
+            SELECT ST_AsMVT(mvt_geom.*, ?) FROM mvt_geom;
+            """
+            
             cursor.execute(query, (xmin, ymin, xmax, ymax, layer, layer))
             row = cursor.fetchone()
             return row[0] if row else None
@@ -337,7 +350,6 @@ async def get_tile(layer: str, z: int, x: int, y: int):
     mvt_data = await loop.run_in_executor(executor, fetch_tile_sync)
 
     if not mvt_data:
-        # Retornar tile vacío (204 No Content) si no hay intersecciones
         return Response(status_code=204)
 
     return Response(
