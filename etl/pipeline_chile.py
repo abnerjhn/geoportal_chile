@@ -1,142 +1,14 @@
+import geopandas as gpd
+import pandas as pd
 import os
 import sqlite3
-import pandas as pd
-import geopandas as gpd
-from shapely.geometry import Polygon, Point
 import random
+from shapely.geometry import Point, Polygon
+
+# Standard script for Chile Territorial ETL
+# Processes layers sequentially to minimize memory footprint on Railway builds
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Data/raw está fuera de geoportal_chile
-RAW_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'data', 'raw'))
-
-def load_layers():
-    crs = "EPSG:4326"
-    
-    def random_polygon(lon_min, lon_max, lat_min, lat_max, size):
-        lon = random.uniform(lon_min, lon_max - size)
-        lat = random.uniform(lat_min, lat_max - size)
-        return Polygon([
-            (lon, lat),
-            (lon + size, lat),
-            (lon + size, lat + size),
-            (lon, lat + size),
-            (lon, lat)
-        ])
-
-    def random_point(lon_min, lon_max, lat_min, lat_max):
-        return Point(random.uniform(lon_min, lon_max), random.uniform(lat_min, lat_max))
-
-    # Paths: configurable via environment variables, fallback to local defaults
-    DATA_RAW_DIR = os.environ.get('DATA_RAW_DIR', os.path.abspath(os.path.join(BASE_DIR, '..', 'data_raw')))
-    DOWNLOADS_DIR = os.environ.get('DOWNLOADS_DIR', DATA_RAW_DIR)
-    DPA_DIR = os.environ.get('DPA_DIR', DATA_RAW_DIR)
-    layers = {}
-    
-    # 1. Sitios Prioritarios Integrados
-    path_sp = os.path.join(DOWNLOADS_DIR, 'sitios_prior_integrados.json')
-    if os.path.exists(path_sp):
-        print(f"[{path_sp}] Cargando SP reales...")
-        layers["sitios_prioritarios"] = gpd.read_file(path_sp)
-    else:
-        print("Mocking SP...")
-        layers["sitios_prioritarios"] = gpd.GeoDataFrame({
-            "id": [1], "nombre": ["Mock SP"], "geometry": [random_polygon(-74, -72, -43, -40, 0.5)]
-        }, crs=crs)
-
-    # 2. Areas Protegidas
-    path_ap = os.path.join(DOWNLOADS_DIR, 'Areas_Protegidas.json')
-    if os.path.exists(path_ap):
-        print(f"[{path_ap}] Cargando AP reales...")
-        layers["areas_protegidas"] = gpd.read_file(path_ap)
-    else:
-        print("Mocking AP...")
-        layers["areas_protegidas"] = gpd.GeoDataFrame({
-            "id": [1], "tipo": ["Parque Marino mock"], "geometry": [random_polygon(-74.5, -73.5, -43.5, -42.0, 0.6)]
-        }, crs=crs)
-
-    # 3. Ecosistemas
-    print(f"DEBUG: Buscando ecosistemas en {DOWNLOADS_DIR}...")
-    # Listar archivos para depuración
-    if os.path.exists(DOWNLOADS_DIR):
-        print(f"DEBUG: Archivos en {DOWNLOADS_DIR}: {os.listdir(DOWNLOADS_DIR)}")
-    
-    path_eco = os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')
-    if not os.path.exists(path_eco):
-        # Intento alternativo por si acaso
-        import glob
-        matches = glob.glob(os.path.join(DOWNLOADS_DIR, "*cosistema*.json"))
-        if matches:
-            path_eco = matches[0]
-            print(f"DEBUG: Encontrado alternativo: {path_eco}")
-
-    if os.path.exists(path_eco):
-        print(f"[{path_eco}] Cargando Ecosistemas reales...")
-        gdf_eco = gpd.read_file(path_eco)
-        print(f"DEBUG: Ecosistemas cargados: {len(gdf_eco)} filas")
-        # Normalizar columnas a minúsculas
-        gdf_eco.columns = [c.lower() for c in gdf_eco.columns]
-        # Reparar geometrías inválidas
-        print(f" -> Reparando geometrías en ecosistemas...")
-        gdf_eco['geometry'] = gdf_eco['geometry'].buffer(0)
-        layers["ecosistemas"] = gdf_eco
-    else:
-        print(f"ERROR: No se encontró el archivo de ecosistemas en {DOWNLOADS_DIR}")
-
-    # Mocks for missing ones
-    layers["pertenencias_mineras"] = gpd.GeoDataFrame({
-        "id": [1, 2, 3], "titular": ["Minera A", "Minera B", "Exploraciones C"], "estado": ["Constituida", "En Trámite", "Constituida"],
-        "geometry": [random_polygon(-73.5, -71.5, -43.5, -40.5, 0.3) for _ in range(3)]
-    }, crs=crs)
-
-    # Note: Concesiones and ECMPO are now loaded from real files below if they exist.
-    # We keep these empty GDFs just in case files are missing to avoid KeyErrors.
-    if "concesiones_acuicultura" not in layers:
-        layers["concesiones_acuicultura"] = gpd.GeoDataFrame(columns=['geometry'], crs=crs)
-    if "ecmpo" not in layers:
-        layers["ecmpo"] = gpd.GeoDataFrame(columns=['geometry'], crs=crs)
-
-    # areas_marinas was mapped before in backend, let's keep a mock for backward compatibility
-    layers["areas_marinas"] = gpd.GeoDataFrame({
-        "id": [1], "tipo": ["Parque Marino mock amp"], "decreto": ["Dec-20"],
-        "geometry": [random_polygon(-74.5, -73.5, -43.5, -42.0, 0.6)]
-    }, crs=crs)
-
-    layers["especies_conservacion"] = gpd.GeoDataFrame({
-        "id": [1, 2], "taxonomia": ["Pudu puda", "Lycalopex fulvipes"], "estado_conservacion": ["Vulnerable", "En Peligro"],
-        "geometry": [random_point(-73.5, -71.5, -43.5, -40.5) for _ in range(2)]
-    }, crs=crs)
-
-    # 8. Regiones
-    path_reg = os.path.join(DPA_DIR, 'Regional.json')
-    if os.path.exists(path_reg):
-        print(f"[{path_reg}] Cargando Regiones reales...")
-        layers["regiones"] = gpd.read_file(path_reg)
-
-    # 9. Provincias
-    path_prov = os.path.join(DPA_DIR, 'Provincias.json')
-    if os.path.exists(path_prov):
-        print(f"[{path_prov}] Cargando Provincias reales...")
-        layers["provincias"] = gpd.read_file(path_prov)
-
-    # 10. Comunas
-    path_com = os.path.join(DPA_DIR, 'comunas.json')
-    if os.path.exists(path_com):
-        print(f"[{path_com}] Cargando Comunas reales...")
-        layers["comunas"] = gpd.read_file(path_com)
-
-    # 11. Concesiones Acuicultura (corrected geographic projection)
-    path_acu = os.path.join(DPA_DIR, 'Concesiones_Acuicultura_geo.json')
-    if os.path.exists(path_acu):
-        print(f"[{path_acu}] Cargando Concesiones de Acuicultura...")
-        layers["concesiones_acuicultura"] = gpd.read_file(path_acu)
-
-    # 12. ECMPO - Espacios Costeros Marinos de Pueblos Originarios
-    path_ecmpo = os.path.join(DPA_DIR, 'ECMPO_geo.json')
-    if os.path.exists(path_ecmpo):
-        print(f"[{path_ecmpo}] Cargando ECMPO...")
-        layers["ecmpo"] = gpd.read_file(path_ecmpo)
-
-    return layers
 
 def process_and_export():
     # Caminno para el log que podremos ver desde la web
@@ -147,7 +19,7 @@ def process_and_export():
     class Logger:
         def __init__(self, filename):
             self.terminal = sys.stdout
-            self.log = open(filename, "a", encoding="utf-8")
+            self.log = open(filename, "w", encoding="utf-8")
         def write(self, message):
             self.terminal.write(message)
             self.log.write(message)
@@ -159,75 +31,113 @@ def process_and_export():
     sys.stdout = Logger(log_path)
     sys.stderr = sys.stdout
 
-    print("Iniciando ETL con datos reales (GeoPandas)...")
-    layers = load_layers()
-        
-    # Use DATABASE_PATH env var if set, otherwise default to relative path
-    _default = os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite'))
-    db_path = os.environ.get('DATABASE_PATH', _default)
-    os.makedirs(os.path.dirname(db_path), exist_ok=True)
-    print(f"Database output path: {db_path}")
+    print("Iniciando ETL con datos reales (GeoPandas Sequential)...")
     
+    # Paths: configurable via environment variables
+    DATA_RAW_DIR = os.environ.get('DATA_RAW_DIR', os.path.abspath(os.path.join(BASE_DIR, '..', 'data_raw')))
+    DOWNLOADS_DIR = os.environ.get('DOWNLOADS_DIR', DATA_RAW_DIR)
+    DPA_DIR = os.environ.get('DPA_DIR', DATA_RAW_DIR)
+    db_path = os.environ.get('DATABASE_PATH', os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite')))
+    
+    # Preparar DB
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
     if os.path.exists(db_path):
         try:
             os.remove(db_path)
             print(f"Base de datos anterior eliminada: {db_path}")
         except Exception as e:
-            print(f"Error borrando DB anterior, cuidado con locks. {e}")
-            
-    print(f"\nExportando {len(layers)} capas a: {db_path}...")
+            print(f"WARN: No se pudo eliminar la DB anterior ({e})")
     
-    # Try SpatiaLite driver first, fall back to GPKG if it fails
+    # Lista de capas reales a procesar (Name, Path, OptionalModifierFunc)
+    capas_reales = [
+        ("sitios_prioritarios", os.path.join(DOWNLOADS_DIR, 'sitios_prior_integrados.json'), None),
+        ("areas_protegidas", os.path.join(DOWNLOADS_DIR, 'Areas_Protegidas.json'), None),
+        ("ecosistemas", os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json'), None),
+        ("regiones", os.path.join(DPA_DIR, 'Regional.json'), None),
+        ("provincias", os.path.join(DPA_DIR, 'Provincias.json'), None),
+        ("comunas", os.path.join(DPA_DIR, 'comunas.json'), None),
+        ("concesiones_acuicultura", os.path.join(DPA_DIR, 'Concesiones_Acuicultura_geo.json'), None),
+        ("ecmpo", os.path.join(DPA_DIR, 'ECMPO_geo.json'), None),
+    ]
+
     driver = 'SQLite'
     spatialite = True
-    
-    for name, gdf in layers.items():
-        print(f" -> Exportando {name} ({len(gdf)} filas)...")
-        export_gdf = gdf.copy()
-        
-        # Ensure column types are compatible with sqlite
-        for col in export_gdf.columns:
-            if col != 'geometry':
-                if pd.api.types.is_string_dtype(export_gdf[col]) or pd.api.types.is_object_dtype(export_gdf[col]):
-                    export_gdf[col] = export_gdf[col].astype(object)
-            else:
-                # Reparar geometrías al vuelo por si quedaron inválidas tras simplificación/carga
-                export_gdf['geometry'] = export_gdf['geometry'].buffer(0)
-        
+
+    for name, path in capas_reales:
+        if not os.path.exists(path):
+            print(f"WARN: No se encontró {path}, saltando...")
+            continue
+            
+        print(f" -> Procesando {name} desde {path}...")
         try:
-            export_gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
-            print(f"    OK ({driver}, spatialite={spatialite})")
+            gdf = gpd.read_file(path)
+            
+            # Normalizar columnas a minúsculas
+            gdf.columns = [c.lower() for c in gdf.columns]
+            
+            # Garantizar que las geometrías sean válidas
+            print(f"    Reparando geometrías...")
+            gdf['geometry'] = gdf['geometry'].buffer(0)
+            
+            # Prevenir problemas de tipos antes de exportar
+            print(f"    Exportando {len(gdf)} filas...")
+            for col in gdf.columns:
+                if col != 'geometry':
+                    if pd.api.types.is_string_dtype(gdf[col]) or pd.api.types.is_object_dtype(gdf[col]):
+                        gdf[col] = gdf[col].astype(object)
+
+            gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
+            print(f"    OK")
+            del gdf # IMPORTANTE: Liberar memoria
         except Exception as e:
-            print(f"    WARN: {driver} failed ({e}), retrying with GPKG driver...")
-            driver = 'GPKG'
-            spatialite = False
-            try:
-                export_gdf.to_file(db_path, driver=driver, layer=name)
-                print(f"    OK ({driver})")
-            except Exception as e2:
-                print(f"    ERROR: Both drivers failed for {name}: {e2}")
-        
-    # Verify the database was created
+            print(f"    ERROR en {name}: {e}")
+
+    # Mocks para capas que no tienen archivo GeoJSON todavía
+    print(" -> Generando Mocks para capas faltantes...")
+    crs = "EPSG:4326"
+    
+    def random_polygon(x_min, x_max, y_min, y_max, size=0.1):
+        x = random.uniform(x_min, x_max)
+        y = random.uniform(y_min, y_max)
+        return Polygon([(x, y), (x+size, y), (x+size, y+size), (x, y+size)])
+
+    mock_layers_data = [
+        ("pertenencias_mineras", {
+            "id": [1, 2, 3], "titular": ["Minera A", "Minera B", "Exploraciones C"], "estado": ["Constituida", "En Trámite", "Constituida"],
+            "geometry": [random_polygon(-73.5, -71.5, -43.5, -40.5, 0.3) for _ in range(3)]
+        }),
+        ("areas_marinas", {
+            "id": [1], "tipo": ["Parque Marino mock amp"], "decreto": ["Dec-20"],
+            "geometry": [random_polygon(-74.5, -73.5, -43.5, -42.0, 0.6)]
+        }),
+        ("especies_conservacion", {
+            "id": [1, 2], "taxonomia": ["Pudu puda", "Lycalopex fulvipes"], "estado_conservacion": ["Vulnerable", "En Peligro"],
+            "geometry": [Point(random.uniform(-73.5, -71.5), random.uniform(-43.5, -40.5)) for _ in range(2)]
+        })
+    ]
+    
+    for name, data in mock_layers_data:
+        gdf_mock = gpd.GeoDataFrame(data, crs=crs)
+        gdf_mock.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
+        print(f" -> Mock {name} OK")
+        del gdf_mock
+
+    # Finalizar
     if os.path.exists(db_path):
         size_mb = os.path.getsize(db_path) / 1024 / 1024
-        print(f"\nDB generada: {db_path} ({size_mb:.1f} MB)")
+        print(f"\nDB generada exitosamente: {db_path} ({size_mb:.1f} MB)")
         
-        # Set WAL mode for concurrent reads
+        # Activar modo WAL para concurrencia
         try:
-            with sqlite3.connect(db_path) as sqlite_conn:
-                cursor = sqlite_conn.cursor()
-                cursor.execute('PRAGMA journal_mode=WAL;')
-                sqlite_conn.commit()
-                # List tables
-                cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
-                tables = [r[0] for r in cursor.fetchall()]
-                print(f"Tablas en DB: {tables}")
-        except Exception as e:
-            print(f"WARN: Could not set WAL mode: {e}")
+            with sqlite3.connect(db_path) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                print("Modo SQLite WAL activado.")
+        except:
+            pass
     else:
-        print(f"\nERROR CRITICO: No se creó la base de datos en {db_path}")
-        
+        print(f"\nERROR: No se generó la base de datos.")
+    
     print("ETL finalizado.")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     process_and_export()
