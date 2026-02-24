@@ -60,7 +60,7 @@ def load_layers():
     if os.path.exists(DOWNLOADS_DIR):
         print(f"DEBUG: Archivos en {DOWNLOADS_DIR}: {os.listdir(DOWNLOADS_DIR)}")
     
-    path_eco = os.path.join(DOWNLOADS_DIR, 'Ecosistemas_multipart.json')
+    path_eco = os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')
     if not os.path.exists(path_eco):
         # Intento alternativo por si acaso
         import glob
