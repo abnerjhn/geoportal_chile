@@ -55,27 +55,28 @@ def load_layers():
         }, crs=crs)
 
     # 3. Ecosistemas
-    path_eco = os.path.join(DOWNLOADS_DIR, 'EcosistemasxAPxSP.json')
+    path_eco = os.path.join(DOWNLOADS_DIR, 'Ecosistemas_multipart.json')
     if os.path.exists(path_eco):
         print(f"[{path_eco}] Cargando Ecosistemas reales...")
-        layers["ecosistemas"] = gpd.read_file(path_eco)
+        gdf_eco = gpd.read_file(path_eco)
+        # Normalizar columnas a minúsculas
+        gdf_eco.columns = [c.lower() for c in gdf_eco.columns]
+        layers["ecosistemas"] = gdf_eco
+    else:
+        print(f"WARN: No se encontró {path_eco}")
 
     # Mocks for missing ones
-    print("Generando Mocks para capas faltantes...")
     layers["pertenencias_mineras"] = gpd.GeoDataFrame({
         "id": [1, 2, 3], "titular": ["Minera A", "Minera B", "Exploraciones C"], "estado": ["Constituida", "En Trámite", "Constituida"],
         "geometry": [random_polygon(-73.5, -71.5, -43.5, -40.5, 0.3) for _ in range(3)]
     }, crs=crs)
 
-    layers["concesiones_acuicultura"] = gpd.GeoDataFrame({
-        "id": [1], "titular": ["Salmonera Sur"], "especie": ["Salmón"], "resolucion": ["DS-100"],
-        "geometry": [random_polygon(-74, -73, -43, -41, 0.2)]
-    }, crs=crs)
-
-    layers["ecmpo"] = gpd.GeoDataFrame({
-        "id": [1], "comunidad": ["Comunidad Williche Destacada"], "estado_tramite": ["Aprobado"],
-        "geometry": [random_polygon(-73.8, -73.2, -42.8, -41.5, 0.4)]
-    }, crs=crs)
+    # Note: Concesiones and ECMPO are now loaded from real files below if they exist.
+    # We keep these empty GDFs just in case files are missing to avoid KeyErrors.
+    if "concesiones_acuicultura" not in layers:
+        layers["concesiones_acuicultura"] = gpd.GeoDataFrame(columns=['geometry'], crs=crs)
+    if "ecmpo" not in layers:
+        layers["ecmpo"] = gpd.GeoDataFrame(columns=['geometry'], crs=crs)
 
     # areas_marinas was mapped before in backend, let's keep a mock for backward compatibility
     layers["areas_marinas"] = gpd.GeoDataFrame({
