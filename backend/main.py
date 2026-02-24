@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v14-mvt-robust-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V14_2026-02-24T06-45-00"
+        info["deploy_id"] = "v15-mvt-and-feature-info-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V15_2026-02-24T07-10-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -271,7 +271,7 @@ from fastapi import Response
 async def get_tile(layer: str, z: int, x: int, y: int):
     """
     Genera dinámicamente un Vector Tile (MVT) desde SpatiaLite.
-    Super-robusto ante diferentes esquemas y nombres de columnas.
+    Optimizado para SpatiaLite 5.0 (ST_AsMVT es agregado y solo de geometría).
     """
     valid_layers = ["concesiones_mineras_const", "concesiones_mineras_tramite", "ecmpo", "ecosistemas", "areas_protegidas"]
     if layer not in valid_layers:
@@ -290,29 +290,13 @@ async def get_tile(layer: str, z: int, x: int, y: int):
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            
-            # 1. Detectar columnas reales (sin citar para ser case-insensitive en la detección)
+            # Detectar columna de geometría
             cursor.execute(f"PRAGMA table_info('{layer}')")
             all_cols = [r[1] for r in cursor.fetchall()]
-            
-            # Detectar columna de geometría (case insensitive)
-            geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), None)
-            if not geom_col:
-                # Fallback a buscar en geometry_columns si pragma falló (raro)
-                cursor.execute("SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = ?", (layer,))
-                row = cursor.fetchone()
-                geom_col = row[0] if row else "geometry"
+            geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), "geometry")
 
-            # 2. Columnas de metadata
-            useful_cols = ['nombre', 'situacion', 'tipo_conce', 'titular_no', 'titular', 'estado', 'tipo', 'piso', 'codigo']
-            cols_to_include = [c for c in all_cols if c.lower() in useful_cols]
-            # Usar comillas dobles para escapar nombres de columnas pero con el case REAL detectado
-            cols_str = ", ".join([f't."{c}"' for c in cols_to_include])
-            if cols_str: cols_str = ", " + cols_str
-
-            # 3. Consulta FINAL Robusta
-            # NOTA: No citamos la columna de geometría en ST_Transform para que SQLite la encuentre 
-            # de forma case-insensitive si hay discrepancias menores
+            # SQL para SpatiaLite 5.0: ST_AsMVT(geom, name)
+            # NOTA: En SpatiaLite 5.0 ST_AsMVT es un agregador que solo acepta la geometría decorada por ST_AsMVTGeom
             query = f"""
             WITH 
             bounds AS (
@@ -325,7 +309,6 @@ async def get_tile(layer: str, z: int, x: int, y: int):
                         (SELECT geom FROM bounds),
                         4096, 64, true
                     ) AS geom
-                    {cols_str}
                 FROM "{layer}" t
                 WHERE t.ROWID IN (
                     SELECT rowid FROM SpatialIndex 
@@ -333,7 +316,7 @@ async def get_tile(layer: str, z: int, x: int, y: int):
                     AND search_frame = ST_Transform((SELECT geom FROM bounds), 4326)
                 )
             )
-            SELECT ST_AsMVT(mvt_geom.*, ?) FROM mvt_geom;
+            SELECT ST_AsMVT(mvt_geom.geom, ?) FROM mvt_geom;
             """
             
             cursor.execute(query, (xmin, ymin, xmax, ymax, layer, layer))
@@ -348,20 +331,51 @@ async def get_tile(layer: str, z: int, x: int, y: int):
     try:
         loop = asyncio.get_event_loop()
         mvt_data = await loop.run_in_executor(executor, fetch_tile_sync)
-
-        if not mvt_data:
-            return Response(status_code=204)
-
-        return Response(
-            content=mvt_data,
-            media_type="application/vnd.mapbox-vector-tile",
-            headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*"
-            }
-        )
+        if not mvt_data: return Response(status_code=204)
+        return Response(content=mvt_data, media_type="application/vnd.mapbox-vector-tile",
+                        headers={"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"})
     except Exception as e:
         return Response(content=json.dumps({"error": str(e)}), status_code=500, media_type="application/json")
+
+@app.get("/api/feature-info/{layer}/{lat}/{lon}")
+async def get_feature_info(layer: str, lat: float, lon: float):
+    """Obtiene metadatos de un punto específico para capas servidas por MVT."""
+    def fetch_info_sync():
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            # Detectar columna de geometría
+            cursor.execute(f"PRAGMA table_info('{layer}')")
+            all_cols = [r[1] for r in cursor.fetchall()]
+            geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), "geometry")
+
+            query = f"""
+            SELECT * FROM "{layer}" 
+            WHERE ST_Intersects("{geom_col}", ST_SetSRID(ST_Point(?, ?), 4326))
+            AND ROWID IN (
+                SELECT rowid FROM SpatialIndex 
+                WHERE f_table_name = ? 
+                AND search_frame = ST_BuildMBR(?, ?, ?, ?)
+            )
+            LIMIT 1;
+            """
+            # BBox pequeño para el índice
+            eps = 0.0001
+            cursor.execute(query, (lon, lat, layer, lon-eps, lat-eps, lon+eps, lat+eps))
+            row = cursor.fetchone()
+            if row:
+                d = dict(row)
+                if geom_col in d: del d[geom_col]
+                if 'GEOMETRY' in d: del d['GEOMETRY']
+                return d
+            return None
+        finally:
+            conn.close()
+
+    loop = asyncio.get_event_loop()
+    info = await loop.run_in_executor(executor, fetch_info_sync)
+    if not info: return {"error": "No feature found"}
+    return info
 
 # Servir Frontend
 from fastapi.staticfiles import StaticFiles

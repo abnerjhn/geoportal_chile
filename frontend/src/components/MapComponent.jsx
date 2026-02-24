@@ -358,7 +358,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
             'terrenos-fill'
         ];
 
-        map.current.on('click', clickableLayers, (e) => {
+        map.current.on('click', clickableLayers, async (e) => {
             // Do not show popup if currently drawing a polygon
             if (draw.current && draw.current.getMode() === 'draw_polygon') {
                 return;
@@ -372,7 +372,21 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
             if (e.features.length > 0) {
                 // Determine the topmost feature by the layers array order
                 const feature = e.features[0];
-                const props = feature.properties;
+                let props = { ...feature.properties };
+
+                // Fetch full metadata for vector tile layers (as MVT only carries geometry in V15)
+                if (feature.source === 'concesiones_mineras_const' || feature.source === 'concesiones_mineras_tramite') {
+                    try {
+                        const response = await fetch(`${window.location.origin}/api/feature-info/${feature.source}/${e.lngLat.lat}/${e.lngLat.lng}`);
+                        const data = await response.json();
+                        if (!data.error) {
+                            props = { ...props, ...data };
+                        }
+                    } catch (err) {
+                        console.error("Error fetching feature info:", err);
+                    }
+                }
+
                 let title = "Detalle";
 
                 if (feature.layer.id.includes('areas_protegidas')) {
