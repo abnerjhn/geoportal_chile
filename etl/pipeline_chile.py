@@ -52,7 +52,7 @@ def process_and_export():
     capas_reales = [
         ("sitios_prioritarios", os.path.join(DOWNLOADS_DIR, 'sitios_prior_integrados.json')),
         ("areas_protegidas", os.path.join(DOWNLOADS_DIR, 'Areas_Protegidas.json')),
-        ("ecosistemas", os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')),
+        # ("ecosistemas", os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')),
         ("regiones", os.path.join(DPA_DIR, 'Regional.json')),
         ("provincias", os.path.join(DPA_DIR, 'Provincias.json')),
         ("comunas", os.path.join(DPA_DIR, 'comunas.json')),
