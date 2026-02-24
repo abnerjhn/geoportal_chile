@@ -37,7 +37,7 @@ def process_and_export():
     DATA_RAW_DIR = os.environ.get('DATA_RAW_DIR', os.path.abspath(os.path.join(BASE_DIR, '..', 'data_raw')))
     DOWNLOADS_DIR = os.environ.get('DOWNLOADS_DIR', DATA_RAW_DIR)
     DPA_DIR = os.environ.get('DPA_DIR', DATA_RAW_DIR)
-    db_path = os.environ.get('DATABASE_PATH', os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_territorial.sqlite')))
+    db_path = os.environ.get('DATABASE_PATH', os.path.abspath(os.path.join(BASE_DIR, '..', 'data', 'chile_v2.sqlite')))
     
     # Preparar DB
     os.makedirs(os.path.dirname(db_path), exist_ok=True)

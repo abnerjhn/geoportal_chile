@@ -22,7 +22,8 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 # Importar configuración de BD
-from database import get_db_connection, DATABASE_PATH
+from database import get_db_connection
+DATABASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'chile_v2.sqlite'))
 
 app = FastAPI(title="Geoportal Chile API", version="1.0.0")
 
