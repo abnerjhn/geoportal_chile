@@ -60,6 +60,8 @@ async def health():
         if os.path.exists(log_path):
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
+        
+        info["deploy_id"] = "v2-sequential-etl-debugging"
     except Exception as e:
         info["error"] = str(e)
     return info
