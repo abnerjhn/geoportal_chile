@@ -114,6 +114,18 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                             type: 'FeatureCollection',
                             features: []
                         }
+                    },
+                    'concesiones_mineras_const': {
+                        type: 'vector',
+                        tiles: [`${window.location.origin}/api/tiles/concesiones_mineras_const/{z}/{x}/{y}.pbf`],
+                        minzoom: 0,
+                        maxzoom: 22
+                    },
+                    'concesiones_mineras_tramite': {
+                        type: 'vector',
+                        tiles: [`${window.location.origin}/api/tiles/concesiones_mineras_tramite/{z}/{x}/{y}.pbf`],
+                        minzoom: 0,
+                        maxzoom: 22
                     }
                 },
                 layers: [
@@ -180,6 +192,38 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         'source-layer': 'Ecosistemas',
                         paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.2 },
                         layout: { visibility: 'none' }
+                    },
+                    {
+                        id: 'concesiones_mineras_const-fill',
+                        type: 'fill',
+                        source: 'concesiones_mineras_const',
+                        'source-layer': 'concesiones_mineras_const',
+                        paint: { 'fill-color': '#d97706', 'fill-opacity': 0.2 },
+                        layout: { visibility: activeLayers?.concesiones_mineras_const ? 'visible' : 'none' }
+                    },
+                    {
+                        id: 'concesiones_mineras_const-line',
+                        type: 'line',
+                        source: 'concesiones_mineras_const',
+                        'source-layer': 'concesiones_mineras_const',
+                        paint: { 'line-color': '#b45309', 'line-width': 1.5 },
+                        layout: { visibility: activeLayers?.concesiones_mineras_const ? 'visible' : 'none' }
+                    },
+                    {
+                        id: 'concesiones_mineras_tramite-fill',
+                        type: 'fill',
+                        source: 'concesiones_mineras_tramite',
+                        'source-layer': 'concesiones_mineras_tramite',
+                        paint: { 'fill-color': '#ea580c', 'fill-opacity': 0.2 },
+                        layout: { visibility: activeLayers?.concesiones_mineras_tramite ? 'visible' : 'none' }
+                    },
+                    {
+                        id: 'concesiones_mineras_tramite-line',
+                        type: 'line',
+                        source: 'concesiones_mineras_tramite',
+                        'source-layer': 'concesiones_mineras_tramite',
+                        paint: { 'line-color': '#c2410c', 'line-width': 1.5 },
+                        layout: { visibility: activeLayers?.concesiones_mineras_tramite ? 'visible' : 'none' }
                     },
 
                     {
@@ -248,8 +292,6 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
             const geojsonSources = {
                 'concesiones': '/static/data/concesiones.json',
                 'ecmpo': '/static/data/ecmpo.json',
-                'concesiones_mineras_const': '/static/data/concesiones_mineras_const.json',
-                'concesiones_mineras_tramite': '/static/data/concesiones_mineras_tramite.json',
                 'regiones': '/static/data/regiones_simplified.json',
                 'provincias': '/static/data/provincias_simplified.json',
                 'comunas': '/static/data/comunas_simplified.json'

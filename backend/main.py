@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v9-mining-rendering-and-metadata-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V9_2026-02-23T23-45-00"
+        info["deploy_id"] = "v10-mvt-architecture-upgrade"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V10_2026-02-24T00-10-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -264,6 +264,90 @@ async def stats_region(id_region: str):
         "region": id_region,
         "conteo_pertenencias": len(res)
     }
+
+from fastapi import Response
+
+@app.get("/api/tiles/{layer}/{z}/{x}/{y}.pbf")
+async def get_tile(layer: str, z: int, x: int, y: int):
+    """
+    Genera dinámicamente un Vector Tile (MVT) desde SpatiaLite.
+    Optimizado para las capas de minería pesadas.
+    """
+    # Validar que la capa exista para evitar SQL Injection
+    valid_layers = [
+        "concesiones_mineras_const", "concesiones_mineras_tramite", 
+        "pertenencias_mineras", "ecmpo", "ecosistemas", "areas_protegidas"
+    ]
+    if layer not in valid_layers:
+        raise HTTPException(status_code=404, detail="Layer not found or not tileable")
+
+    # SQL para generar MVT:
+    # 1. Calcular el BBox del Tile en EPSG:3857 (Web Mercator)
+    # 2. Transformar geometrías a coordenadas locales del tile
+    # 3. Empaquetar como MVT
+    
+    # Constantes Web Mercator
+    WORLD_SIZE = 40075016.68557849
+    ORIGIN_X = -20037508.342789244
+    ORIGIN_Y = 20037508.342789244
+    
+    tile_size = WORLD_SIZE / (2**z)
+    xmin = ORIGIN_X + x * tile_size
+    xmax = xmin + tile_size
+    ymax = ORIGIN_Y - y * tile_size
+    ymin = ymax - tile_size
+    
+    # Consulta robusta con ST_AsMVT
+    # Nota: Transformamos la geometría de la DB (EPSG:4326) a 3857 para el clip y luego MVT
+    query = f"""
+    WITH 
+    bounds AS (
+        SELECT ST_MakeEnvelope(?, ?, ?, ?, 3857) AS geom
+    ),
+    mvt_geom AS (
+        SELECT 
+            ST_AsMVTGeom(
+                ST_Transform(t.GEOMETRY, 3857), 
+                (SELECT geom FROM bounds),
+                4096, 0, false
+            ) AS geom,
+            t.*
+        FROM "{layer}" t
+        WHERE t.ROWID IN (
+            SELECT rowid FROM SpatialIndex 
+            WHERE f_table_name = ? 
+            AND search_frame = ST_Transform((SELECT geom FROM bounds), 4326)
+        )
+    )
+    SELECT ST_AsMVT(mvt_geom.*, ?) FROM mvt_geom;
+    """
+    
+    def fetch_tile_sync():
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            # PRAGMA para optimizar MVT
+            cursor.execute(query, (xmin, ymin, xmax, ymax, layer, layer))
+            row = cursor.fetchone()
+            return row[0] if row else None
+        finally:
+            conn.close()
+
+    loop = asyncio.get_event_loop()
+    mvt_data = await loop.run_in_executor(executor, fetch_tile_sync)
+
+    if not mvt_data:
+        # Retornar tile vacío (204 No Content) si no hay intersecciones
+        return Response(status_code=204)
+
+    return Response(
+        content=mvt_data,
+        media_type="application/vnd.mapbox-vector-tile",
+        headers={
+            "Cache-Control": "public, max-age=3600",
+            "Access-Control-Allow-Origin": "*"
+        }
+    )
 
 # Servir Frontend
 from fastapi.staticfiles import StaticFiles
