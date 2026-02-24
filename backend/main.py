@@ -63,7 +63,7 @@ async def health():
                 info["etl_log_tail"] = f.read()[-2000:]
         
         info["deploy_id"] = "v2-sequential-etl-debugging"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V4_2026-02-23T21-50-00"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V5_2026-02-23T21-55-00"
     except Exception as e:
         info["error"] = str(e)
     return info

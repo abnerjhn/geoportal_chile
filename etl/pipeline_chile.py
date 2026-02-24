@@ -52,7 +52,7 @@ def process_and_export():
     capas_reales = [
         ("sitios_prioritarios", os.path.join(DOWNLOADS_DIR, 'sitios_prior_integrados.json')),
         ("areas_protegidas", os.path.join(DOWNLOADS_DIR, 'Areas_Protegidas.json')),
-        # ("ecosistemas", os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')),
+        ("ecosistemas", os.path.join(DOWNLOADS_DIR, 'Ecosistemas_simplified.json')),
         ("regiones", os.path.join(DPA_DIR, 'Regional.json')),
         ("provincias", os.path.join(DPA_DIR, 'Provincias.json')),
         ("comunas", os.path.join(DPA_DIR, 'comunas.json')),
@@ -118,6 +118,10 @@ def process_and_export():
     
     for name, data in mock_layers_data:
         gdf_mock = gpd.GeoDataFrame(data, crs=crs)
+        # Prevenir problemas de tipos en mocks
+        for col in gdf_mock.columns:
+            if col != 'geometry':
+                gdf_mock[col] = gdf_mock[col].astype(object)
         gdf_mock.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
         print(f" -> Mock {name} OK")
         del gdf_mock
