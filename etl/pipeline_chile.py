@@ -61,6 +61,9 @@ def load_layers():
         gdf_eco = gpd.read_file(path_eco)
         # Normalizar columnas a minúsculas
         gdf_eco.columns = [c.lower() for c in gdf_eco.columns]
+        # Reparar geometrías inválidas
+        print(f" -> Reparando geometrías en ecosistemas...")
+        gdf_eco['geometry'] = gdf_eco['geometry'].buffer(0)
         layers["ecosistemas"] = gdf_eco
     else:
         print(f"WARN: No se encontró {path_eco}")
@@ -153,6 +156,9 @@ def process_and_export():
             if col != 'geometry':
                 if pd.api.types.is_string_dtype(export_gdf[col]) or pd.api.types.is_object_dtype(export_gdf[col]):
                     export_gdf[col] = export_gdf[col].astype(object)
+            else:
+                # Reparar geometrías al vuelo por si quedaron inválidas tras simplificación/carga
+                export_gdf['geometry'] = export_gdf['geometry'].buffer(0)
         
         try:
             export_gdf.to_file(db_path, driver=driver, spatialite=spatialite, layer=name)
