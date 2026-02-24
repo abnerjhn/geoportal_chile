@@ -24,7 +24,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
     }, [results?.length]);
 
     React.useEffect(() => {
-        fetch('/static/data/formations.json')
+        fetch('data/formations.json')
             .then(res => { if (!res.ok) return []; return res.json(); })
             .then(data => {
                 const fMap = {};
@@ -268,7 +268,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                     <Layers className="w-5 h-5 text-slate-400" /> CAPAS DE REFERENCIA
                 </h3>
                 <div className="space-y-3">
-                    {['areas_protegidas', 'sitios_prioritarios', 'ecosistemas', 'concesiones', 'ecmpo', 'regiones', 'provincias', 'comunas'].map((layerId) => (
+                    {['areas_protegidas', 'sitios_prioritarios', 'ecosistemas', 'concesiones', 'ecmpo', 'concesiones_mineras_const', 'concesiones_mineras_tramite', 'regiones', 'provincias', 'comunas'].map((layerId) => (
                         <div key={layerId} className="flex flex-col gap-1">
                             <label className="flex items-center gap-3 cursor-pointer group">
                                 <div className="relative flex items-center">

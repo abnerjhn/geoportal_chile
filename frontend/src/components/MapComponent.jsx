@@ -432,6 +432,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         const spArea = sumArea(r.restricciones?.sitios_prioritarios);
                         const apArea = sumArea(r.restricciones?.areas_protegidas);
                         const acuArea = sumArea(r.restricciones?.concesiones_acuicultura);
+                        const ecmpoArea = sumArea(r.restricciones?.ecmpo);
                         const miningAreaConst = sumArea(r.restricciones?.concesiones_mineras_const);
                         const miningAreaTramite = sumArea(r.restricciones?.concesiones_mineras_tramite);
                         const totalArea = r.area_total_ha || 0;
@@ -490,7 +491,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
     // Handle Layer Visibility Toggles
     useEffect(() => {
         if (!map.current) return;
-        ['areas_protegidas', 'sitios_prioritarios', 'ecosistemas', 'concesiones', 'ecmpo', 'terrenos', 'regiones', 'provincias', 'comunas'].forEach(layer => {
+        ['areas_protegidas', 'sitios_prioritarios', 'ecosistemas', 'concesiones', 'ecmpo', 'concesiones_mineras_const', 'concesiones_mineras_tramite', 'terrenos', 'regiones', 'provincias', 'comunas'].forEach(layer => {
             const visibility = activeLayers[layer] ? 'visible' : 'none';
             if (map.current.getLayer(`${layer}-fill`)) {
                 map.current.setLayoutProperty(`${layer}-fill`, 'visibility', visibility);

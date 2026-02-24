@@ -92,8 +92,9 @@ def process_and_export():
             # Limpiar NaNs para evitar errores de exportación ('nan' error)
             for col in gdf.columns:
                 if col != 'geometry':
-                    # Convertir a string y llenar nulos
-                    gdf[col] = gdf[col].fillna('').astype(str)
+                    # Forzar a string estándar (object) y limpiar NaNs/Nones
+                    gdf[col] = gdf[col].astype(str).replace(['nan', 'None', '<NA>', 'NaN'], '')
+                    gdf[col] = gdf[col].astype(object)
 
             # Prevenir problemas de tipos antes de exportar
             print(f"    Exportando {len(gdf)} filas...")
