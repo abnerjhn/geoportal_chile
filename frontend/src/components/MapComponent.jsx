@@ -248,8 +248,8 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
             const geojsonSources = {
                 'concesiones': '/static/data/concesiones.json',
                 'ecmpo': '/static/data/ecmpo.json',
-                'concesiones_mineras_const': '/static/data/concesion_minera_CONSTITUIDA.json',
-                'concesiones_mineras_tramite': '/static/data/concesion_minera_EN_TRAMITE.json',
+                'concesiones_mineras_const': '/static/data/concesiones_mineras_const.json',
+                'concesiones_mineras_tramite': '/static/data/concesiones_mineras_tramite.json',
                 'regiones': '/static/data/regiones_simplified.json',
                 'provincias': '/static/data/provincias_simplified.json',
                 'comunas': '/static/data/comunas_simplified.json'
