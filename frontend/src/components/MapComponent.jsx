@@ -25,10 +25,11 @@ if (!protocolAdded) {
 }
 
 
-const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, mapStyle, results }, ref) => {
+const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, mapStyle, results, onMapReady }, ref) => {
     const mapContainer = useRef(null);
     const map = useRef(null);
     const draw = useRef(null);
+    const [mapLoaded, setMapLoaded] = React.useState(false);
 
     useImperativeHandle(ref, () => ({
         clearDrawings() {
@@ -107,26 +108,6 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         type: 'vector',
                         url: 'pmtiles://data/ecosistemas.pmtiles'
                     },
-                    'concesiones': {
-                        type: 'geojson',
-                        data: '/static/data/concesiones.json'
-                    },
-                    'ecmpo': {
-                        type: 'geojson',
-                        data: '/static/data/ecmpo.json'
-                    },
-                    'regiones': {
-                        type: 'geojson',
-                        data: '/static/data/regiones_simplified.json'
-                    },
-                    'provincias': {
-                        type: 'geojson',
-                        data: '/static/data/provincias_simplified.json'
-                    },
-                    'comunas': {
-                        type: 'geojson',
-                        data: '/static/data/comunas_simplified.json'
-                    },
                     'terrenos-source': {
                         type: 'geojson',
                         data: {
@@ -200,76 +181,7 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         paint: { 'fill-color': '#fbbf24', 'fill-opacity': 0.2 },
                         layout: { visibility: 'none' }
                     },
-                    {
-                        id: 'concesiones-fill',
-                        type: 'fill',
-                        source: 'concesiones',
-                        paint: { 'fill-color': '#06b6d4', 'fill-opacity': 0.2 },
-                        layout: { visibility: activeLayers?.concesiones ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'concesiones-line',
-                        type: 'line',
-                        source: 'concesiones',
-                        paint: { 'line-color': '#0891b2', 'line-width': 1.5 },
-                        layout: { visibility: activeLayers?.concesiones ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'ecmpo-fill',
-                        type: 'fill',
-                        source: 'ecmpo',
-                        paint: { 'fill-color': '#f43f5e', 'fill-opacity': 0.2 },
-                        layout: { visibility: activeLayers?.ecmpo ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'ecmpo-line',
-                        type: 'line',
-                        source: 'ecmpo',
-                        paint: { 'line-color': '#e11d48', 'line-width': 1.5 },
-                        layout: { visibility: activeLayers?.ecmpo ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'regiones-fill',
-                        type: 'fill',
-                        source: 'regiones',
-                        paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.1 },
-                        layout: { visibility: activeLayers?.regiones ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'regiones-line',
-                        type: 'line',
-                        source: 'regiones',
-                        paint: { 'line-color': '#4f46e5', 'line-width': 2 },
-                        layout: { visibility: activeLayers?.regiones ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'provincias-fill',
-                        type: 'fill',
-                        source: 'provincias',
-                        paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.1 },
-                        layout: { visibility: activeLayers?.provincias ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'provincias-line',
-                        type: 'line',
-                        source: 'provincias',
-                        paint: { 'line-color': '#0d9488', 'line-width': 1.5 },
-                        layout: { visibility: activeLayers?.provincias ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'comunas-fill',
-                        type: 'fill',
-                        source: 'comunas',
-                        paint: { 'fill-color': '#f97316', 'fill-opacity': 0.1 },
-                        layout: { visibility: activeLayers?.comunas ? 'visible' : 'none' }
-                    },
-                    {
-                        id: 'comunas-line',
-                        type: 'line',
-                        source: 'comunas',
-                        paint: { 'line-color': '#ea580c', 'line-width': 1 },
-                        layout: { visibility: activeLayers?.comunas ? 'visible' : 'none' }
-                    },
+
                     {
                         id: 'terrenos-fill',
                         type: 'fill',
@@ -326,6 +238,51 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
         map.current.on('draw.create', handleDrawEvent);
         map.current.on('draw.update', handleDrawEvent);
         map.current.on('draw.delete', () => { onAnalyzePolygon(null) });
+
+        // Mark draw tool as ready immediately — map base + draw loaded
+        setMapLoaded(true);
+        if (onMapReady) onMapReady();
+
+        // Lazy-load heavy GeoJSON sources AFTER the map and draw tool are ready
+        map.current.on('load', () => {
+            const geojsonSources = {
+                'concesiones': '/static/data/concesiones.json',
+                'ecmpo': '/static/data/ecmpo.json',
+                'regiones': '/static/data/regiones_simplified.json',
+                'provincias': '/static/data/provincias_simplified.json',
+                'comunas': '/static/data/comunas_simplified.json'
+            };
+            const layerDefs = [
+                { id: 'concesiones-fill', type: 'fill', source: 'concesiones', paint: { 'fill-color': '#06b6d4', 'fill-opacity': 0.2 }, vis: activeLayers?.concesiones },
+                { id: 'concesiones-line', type: 'line', source: 'concesiones', paint: { 'line-color': '#0891b2', 'line-width': 1.5 }, vis: activeLayers?.concesiones },
+                { id: 'ecmpo-fill', type: 'fill', source: 'ecmpo', paint: { 'fill-color': '#f43f5e', 'fill-opacity': 0.2 }, vis: activeLayers?.ecmpo },
+                { id: 'ecmpo-line', type: 'line', source: 'ecmpo', paint: { 'line-color': '#e11d48', 'line-width': 1.5 }, vis: activeLayers?.ecmpo },
+                { id: 'regiones-fill', type: 'fill', source: 'regiones', paint: { 'fill-color': '#6366f1', 'fill-opacity': 0.1 }, vis: activeLayers?.regiones },
+                { id: 'regiones-line', type: 'line', source: 'regiones', paint: { 'line-color': '#4f46e5', 'line-width': 2 }, vis: activeLayers?.regiones },
+                { id: 'provincias-fill', type: 'fill', source: 'provincias', paint: { 'fill-color': '#14b8a6', 'fill-opacity': 0.1 }, vis: activeLayers?.provincias },
+                { id: 'provincias-line', type: 'line', source: 'provincias', paint: { 'line-color': '#0d9488', 'line-width': 1.5 }, vis: activeLayers?.provincias },
+                { id: 'comunas-fill', type: 'fill', source: 'comunas', paint: { 'fill-color': '#f97316', 'fill-opacity': 0.1 }, vis: activeLayers?.comunas },
+                { id: 'comunas-line', type: 'line', source: 'comunas', paint: { 'line-color': '#ea580c', 'line-width': 1 }, vis: activeLayers?.comunas },
+            ];
+            // Add sources
+            Object.entries(geojsonSources).forEach(([name, url]) => {
+                if (!map.current.getSource(name)) {
+                    map.current.addSource(name, { type: 'geojson', data: url });
+                }
+            });
+            // Add layers (before terrenos layers so terrenos stay on top)
+            layerDefs.forEach(def => {
+                if (!map.current.getLayer(def.id)) {
+                    map.current.addLayer({
+                        id: def.id,
+                        type: def.type,
+                        source: def.source,
+                        paint: def.paint,
+                        layout: { visibility: def.vis ? 'visible' : 'none' }
+                    }, 'terrenos-fill');
+                }
+            });
+        });
 
         // Add popups for map features
         const clickableLayers = [
