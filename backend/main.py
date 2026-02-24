@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v12-mvt-schema-aware-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V12_2026-02-24T06-30-00"
+        info["deploy_id"] = "v14-mvt-robust-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V14_2026-02-24T06-45-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -271,26 +271,15 @@ from fastapi import Response
 async def get_tile(layer: str, z: int, x: int, y: int):
     """
     Genera dinámicamente un Vector Tile (MVT) desde SpatiaLite.
-    Optimizado para las capas de minería pesadas.
+    Super-robusto ante diferentes esquemas y nombres de columnas.
     """
-    # Validar que la capa exista para evitar SQL Injection
-    valid_layers = [
-        "concesiones_mineras_const", "concesiones_mineras_tramite", 
-        "pertenencias_mineras", "ecmpo", "ecosistemas", "areas_protegidas"
-    ]
+    valid_layers = ["concesiones_mineras_const", "concesiones_mineras_tramite", "ecmpo", "ecosistemas", "areas_protegidas"]
     if layer not in valid_layers:
-        raise HTTPException(status_code=404, detail="Layer not found or not tileable")
+        raise HTTPException(status_code=404, detail="Layer not tileable")
 
-    # SQL para generar MVT:
-    # 1. Calcular el BBox del Tile en EPSG:3857 (Web Mercator)
-    # 2. Transformar geometrías a coordenadas locales del tile
-    # 3. Empaquetar como MVT
-    
-    # Constantes Web Mercator
     WORLD_SIZE = 40075016.68557849
     ORIGIN_X = -20037508.342789244
     ORIGIN_Y = 20037508.342789244
-    
     tile_size = WORLD_SIZE / (2**z)
     xmin = ORIGIN_X + x * tile_size
     xmax = xmin + tile_size
@@ -302,21 +291,28 @@ async def get_tile(layer: str, z: int, x: int, y: int):
         try:
             cursor = conn.cursor()
             
-            # 1. Detectar el nombre de la columna de geometría
-            cursor.execute("SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = ?", (layer,))
-            row_geom = cursor.fetchone()
-            geom_col = row_geom[0] if row_geom else "GEOMETRY"
-
-            # 2. Detectar columnas disponibles para metadata (evitar 500 si falta alguna)
+            # 1. Detectar columnas reales (sin citar para ser case-insensitive en la detección)
             cursor.execute(f"PRAGMA table_info('{layer}')")
-            cols = [r[1] for r in cursor.fetchall() if r[1].lower() not in [geom_col.lower(), 'ogc_fid']]
-            # Limitar a columnas útiles para el mapa para no engrosar el tile
+            all_cols = [r[1] for r in cursor.fetchall()]
+            
+            # Detectar columna de geometría (case insensitive)
+            geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), None)
+            if not geom_col:
+                # Fallback a buscar en geometry_columns si pragma falló (raro)
+                cursor.execute("SELECT f_geometry_column FROM geometry_columns WHERE f_table_name = ?", (layer,))
+                row = cursor.fetchone()
+                geom_col = row[0] if row else "geometry"
+
+            # 2. Columnas de metadata
             useful_cols = ['nombre', 'situacion', 'tipo_conce', 'titular_no', 'titular', 'estado', 'tipo', 'piso', 'codigo']
-            cols_to_include = [c for c in cols if c.lower() in useful_cols]
+            cols_to_include = [c for c in all_cols if c.lower() in useful_cols]
+            # Usar comillas dobles para escapar nombres de columnas pero con el case REAL detectado
             cols_str = ", ".join([f't."{c}"' for c in cols_to_include])
             if cols_str: cols_str = ", " + cols_str
 
-            # 3. Consulta final dinámica
+            # 3. Consulta FINAL Robusta
+            # NOTA: No citamos la columna de geometría en ST_Transform para que SQLite la encuentre 
+            # de forma case-insensitive si hay discrepancias menores
             query = f"""
             WITH 
             bounds AS (
@@ -343,65 +339,29 @@ async def get_tile(layer: str, z: int, x: int, y: int):
             cursor.execute(query, (xmin, ymin, xmax, ymax, layer, layer))
             row = cursor.fetchone()
             return row[0] if row else None
+        except Exception as e:
+            logging.error(f"TILE ERROR [{layer} {z}/{x}/{y}]: {str(e)}")
+            raise e
         finally:
             conn.close()
 
-    loop = asyncio.get_event_loop()
-    mvt_data = await loop.run_in_executor(executor, fetch_tile_sync)
-
-    if not mvt_data:
-        return Response(status_code=204)
-
-    return Response(
-        content=mvt_data,
-        media_type="application/vnd.mapbox-vector-tile",
-        headers={
-            "Cache-Control": "public, max-age=3600",
-            "Access-Control-Allow-Origin": "*"
-        }
-    )
-
-@app.get("/api/debug-tile/{layer}/{z}/{x}/{y}")
-async def debug_tile(layer: str, z: int, x: int, y: int):
-    """Diagnóstico para el error 500 en MVT."""
-    import traceback
-    WORLD_SIZE = 40075016.68557849
-    ORIGIN_X = -20037508.342789244
-    ORIGIN_Y = 20037508.342789244
-    tile_size = WORLD_SIZE / (2**z)
-    xmin = ORIGIN_X + x * tile_size
-    xmax = xmin + tile_size
-    ymax = ORIGIN_Y - y * tile_size
-    ymin = ymax - tile_size
-    
-    debug_info = {"layer": layer, "z": z, "x": x, "y": y}
     try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # 1. Info de columnas
-        cursor.execute("SELECT f_geometry_column, srid FROM geometry_columns WHERE f_table_name = ?", (layer,))
-        debug_info["geometry_columns"] = cursor.fetchone()
-        
-        cursor.execute(f"PRAGMA table_info('{layer}')")
-        debug_info["pragma_table_info"] = [dict(r) for r in cursor.fetchall()]
-        
-        # 2. Intentar la query por partes
-        # ... simplificamos para el debug ...
-        geom_col = "geometry" # basándonos en lo visto antes
-        query_test = f"SELECT ST_AsMVTGeom(ST_Transform(\"{geom_col}\", 3857), ST_MakeEnvelope(?,?,?,?,3857)) FROM \"{layer}\" LIMIT 1"
-        try:
-            cursor.execute(query_test, (xmin, ymin, xmax, ymax))
-            debug_info["st_asmvtgeom_test"] = "ok"
-        except Exception as e:
-            debug_info["st_asmvtgeom_error"] = str(e)
+        loop = asyncio.get_event_loop()
+        mvt_data = await loop.run_in_executor(executor, fetch_tile_sync)
 
-        conn.close()
+        if not mvt_data:
+            return Response(status_code=204)
+
+        return Response(
+            content=mvt_data,
+            media_type="application/vnd.mapbox-vector-tile",
+            headers={
+                "Cache-Control": "public, max-age=3600",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
     except Exception as e:
-        debug_info["error"] = str(e)
-        debug_info["traceback"] = traceback.format_exc()
-        
-    return debug_info
+        return Response(content=json.dumps({"error": str(e)}), status_code=500, media_type="application/json")
 
 # Servir Frontend
 from fastapi.staticfiles import StaticFiles
