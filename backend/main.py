@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v21.1-emergency-fix-json-import"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V21.1_2026-02-25T08-45-00"
+        info["deploy_id"] = "v21.2-metadata-spatial-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V21.2_2026-02-25T08-55-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -346,10 +346,11 @@ async def get_feature_info(layer: str, lat: float, lon: float):
             all_cols = [r[1] for r in cursor.fetchall()]
             geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), "geometry")
 
+            # Usar GeomFromText para máxima compatibilidad con SpatiaLite 5.x
             query = f"""
             SELECT * FROM "{layer}" 
             WHERE "{geom_col}" IS NOT NULL 
-            AND ST_Intersects("{geom_col}", ST_SetSRID(ST_Point(?, ?), 4326))
+            AND ST_Intersects("{geom_col}", GeomFromText('POINT(' || ? || ' ' || ? || ')', 4326))
             LIMIT 1;
             """
             cursor.execute(query, (lon, lat))
