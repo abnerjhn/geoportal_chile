@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v20-visibility-and-speed-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V20_2026-02-25T07-25-00"
+        info["deploy_id"] = "v21-metadata-and-stability-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V21_2026-02-25T08-30-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -363,10 +363,14 @@ async def get_feature_info(layer: str, lat: float, lon: float):
         finally:
             conn.close()
 
-    loop = asyncio.get_event_loop()
-    info = await loop.run_in_executor(executor, fetch_info_sync)
-    if not info: return {"error": "No feature found"}
-    return info
+    try:
+        loop = asyncio.get_event_loop()
+        info = await loop.run_in_executor(executor, fetch_info_sync)
+        if not info: return {"error": "No feature found"}
+        return info
+    except Exception as e:
+        logging.error(f"FEATURE INFO ERROR [{layer} {lat}/{lon}]: {str(e)}")
+        return {"error": f"Internal Server Error: {str(e)}"}
 
 # Servir Frontend
 from fastapi.staticfiles import StaticFiles

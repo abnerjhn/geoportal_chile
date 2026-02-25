@@ -366,22 +366,12 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                 const feature = e.features[0];
                 let props = { ...feature.properties };
 
-                // Fetch full metadata for vector tile layers (as MVT only carries geometry in V15)
-                if (feature.source === 'concesiones_mineras_const' || feature.source === 'concesiones_mineras_tramite') {
-                    try {
-                        const response = await fetch(`${window.location.origin}/api/feature-info/${feature.source}/${e.lngLat.lat}/${e.lngLat.lng}`);
-                        const data = await response.json();
-                        if (!data.error) {
-                            props = { ...props, ...data };
-                        }
-                    } catch (err) {
-                        console.error("Error fetching feature info:", err);
-                    }
-                }
-
                 let title = "Detalle";
-
-                if (feature.layer.id.includes('areas_protegidas')) {
+                if (feature.layer.id.includes('concesiones_mineras_const')) {
+                    title = "Concesión Minera (Constituida)";
+                } else if (feature.layer.id.includes('concesiones_mineras_tramite')) {
+                    title = "Concesión Minera (En Trámite)";
+                } else if (feature.layer.id.includes('areas_protegidas')) {
                     title = "Área Protegida";
                 } else if (feature.layer.id.includes('sitios_prioritarios')) {
                     title = "Sitio Prioritario";
@@ -401,50 +391,81 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                     title = "Geometría Dibujada/Cargada";
                 }
 
-                let propertiesHtml = '<div style="max-height: 200px; overflow-y: auto; font-size: 11px;">';
-                propertiesHtml += '<table style="width: 100%; border-collapse: collapse; color: #333;">';
+                // Fetch full metadata for vector tile layers (as MVT only carries geometry in V15)
+                if (feature.source === 'concesiones_mineras_const' || feature.source === 'concesiones_mineras_tramite') {
+                    const popup = new maplibregl.Popup({ closeButton: true, closeOnClick: true, maxWidth: '300px' })
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<div class="p-2"><div class="animate-pulse flex space-x-4"><div class="flex-1 space-y-4 py-1"><div class="h-4 bg-slate-200 rounded w-3/4"></div><div class="space-y-2"><div class="h-4 bg-slate-200 rounded"></div><div class="h-4 bg-slate-200 rounded w-5/6"></div></div></div></div></div>`)
+                        .addTo(map.current);
 
-                const importantKeys = ["NombreOrig", "Name", "NOMBRE", "Nombre_SP", "nombre_sp", "Codrnap", "designacio", "REP_SUBPES", "REP_SUBP_1", "REP_SUBP_5", "Región", "Region", "Provincia", "Comuna", "Formacion", "Piso", "area_ha"];
+                    fetch(`${window.location.origin}/api/feature-info/${feature.source}/${e.lngLat.lat}/${e.lngLat.lng}`)
+                        .then(res => {
+                            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                            return res.json();
+                        })
+                        .then(data => {
+                            if (data.error) {
+                                popup.setHTML(`<div class="p-3"><h3 class="font-bold text-slate-800 border-b pb-1 mb-2">${title}</h3><p class="text-xs text-red-500">${data.error}</p></div>`);
+                            } else {
+                                let html = `<div class="p-3 max-h-60 overflow-y-auto w-64"><h3 class="font-bold text-slate-800 border-b pb-1 mb-2 text-sm">${title}</h3><table class="w-full text-[10px] border-collapse">`;
+                                for (const key in data) {
+                                    if (key === 'geometry' || key === 'GEOMETRY' || key === 'GEOM') continue;
+                                    html += `<tr class="border-b border-slate-100"><td class="py-1 font-semibold text-slate-500 pr-2 uppercase">${key}:</td><td class="py-1 text-slate-700 break-words">${data[key]}</td></tr>`;
+                                }
+                                html += `</table></div>`;
+                                popup.setHTML(html);
+                            }
+                        })
+                        .catch(err => {
+                            console.error("Error fetching feature info:", err);
+                            popup.setHTML(`<div class="p-3"><h3 class="font-bold text-slate-800 border-b pb-1 mb-2">${title}</h3><p class="text-[10px] text-slate-500 italic">Error al conectar con la base de datos.</p></div>`);
+                        });
+                } else {
+                    let propertiesHtml = '<div style="max-height: 200px; overflow-y: auto; font-size: 11px;">';
+                    propertiesHtml += '<table style="width: 100%; border-collapse: collapse; color: #333;">';
 
-                const sortedKeys = Object.keys(props).sort((a, b) => {
-                    const idxA = importantKeys.findIndex(k => k.toLowerCase() === a.toLowerCase());
-                    const idxB = importantKeys.findIndex(k => k.toLowerCase() === b.toLowerCase());
-                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                    if (idxA !== -1) return -1;
-                    if (idxB !== -1) return 1;
-                    return a.localeCompare(b);
-                });
+                    const importantKeys = ["NombreOrig", "Name", "NOMBRE", "Nombre_SP", "nombre_sp", "Codrnap", "designacio", "REP_SUBPES", "REP_SUBP_1", "REP_SUBP_5", "Región", "Region", "Provincia", "Comuna", "Formacion", "Piso", "area_ha"];
 
-                sortedKeys.forEach((key) => {
-                    let value = props[key];
-                    if (value === undefined || value === null) return;
-                    if (typeof value === 'number') {
-                        value = new Intl.NumberFormat('es-CL').format(value);
-                    }
+                    const sortedKeys = Object.keys(props).sort((a, b) => {
+                        const idxA = importantKeys.findIndex(k => k.toLowerCase() === a.toLowerCase());
+                        const idxB = importantKeys.findIndex(k => k.toLowerCase() === b.toLowerCase());
+                        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                        if (idxA !== -1) return -1;
+                        if (idxB !== -1) return 1;
+                        return a.localeCompare(b);
+                    });
 
-                    let displayValue = value;
-                    if (typeof value === 'string' && value.startsWith('http')) {
-                        displayValue = `<a href="${value}" target="_blank" style="color: #2563eb; text-decoration: underline;">Ver Enlace</a>`;
-                    }
+                    sortedKeys.forEach((key) => {
+                        let value = props[key];
+                        if (value === undefined || value === null) return;
+                        if (typeof value === 'number') {
+                            value = new Intl.NumberFormat('es-CL').format(value);
+                        }
 
-                    propertiesHtml += `
-                    <tr style="border-bottom: 1px solid #eee;">
-                        <td style="padding: 2px 4px; font-weight: bold; color: #555;">${key}</td>
-                        <td style="padding: 2px 4px;">${displayValue}</td>
-                    </tr>
-                   `;
-                });
-                propertiesHtml += '</table></div>';
+                        let displayValue = value;
+                        if (typeof value === 'string' && value.startsWith('http')) {
+                            displayValue = `<a href="${value}" target="_blank" style="color: #2563eb; text-decoration: underline;">Ver Enlace</a>`;
+                        }
 
-                new maplibregl.Popup({ maxWidth: '300px' })
-                    .setLngLat(e.lngLat)
-                    .setHTML(`
+                        propertiesHtml += `
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 2px 4px; font-weight: bold; color: #555;">${key}</td>
+                            <td style="padding: 2px 4px;">${displayValue}</td>
+                        </tr>
+                       `;
+                    });
+                    propertiesHtml += '</table></div>';
+
+                    new maplibregl.Popup({ maxWidth: '300px' })
+                        .setLngLat(e.lngLat)
+                        .setHTML(`
                         <div style="font-family: sans-serif; padding: 4px;">
                             <strong style="font-size: 1.1em; color: #1e293b; display:block; margin-bottom:4px;">${title}</strong>
                             ${propertiesHtml}
                         </div>
                     `)
-                    .addTo(map.current);
+                        .addTo(map.current);
+                }
             }
         });
 

@@ -107,8 +107,10 @@ def process_and_export():
             map_data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend', 'public', 'data'))
             os.makedirs(map_data_dir, exist_ok=True)
             
-            if name in ["concesiones_mineras_const", "concesiones_mineras_tramite", "ecmpo", "concesiones_acuicultura"]:
-                json_output = os.path.join(map_data_dir, f"{name}.json")
+            if name in ["concesiones_mineras_const", "concesiones_mineras_tramite", "ecmpo", "concesiones_acuicultura", "regiones", "provincias", "comunas"]:
+                # Ajustar nombre de archivo para capas administrativas (usar el sufijo _simplified que pide el frontend)
+                file_name = f"{name}_simplified.json" if name in ["regiones", "provincias", "comunas"] else f"{name}.json"
+                json_output = os.path.join(map_data_dir, file_name)
                 print(f"    Simplificando para el mapa y guardando en {json_output}...")
                 
                 # 1. Limpieza estricta de geometrías NULL/Vacias (según lo reportado por el usuario)
@@ -167,6 +169,13 @@ def process_and_export():
     if os.path.exists(db_path):
         size_mb = os.path.getsize(db_path) / 1024 / 1024
         print(f"\nDB generada exitosamente: {db_path} ({size_mb:.1f} MB)")
+        
+        # Generar formations.json placeholder para evitar 404 en el Sidebar
+        formations_path = os.path.join(map_data_dir, "formations.json")
+        if not os.path.exists(formations_path):
+            print(f" -> Generando placeholder {formations_path}")
+            with open(formations_path, 'w', encoding='utf-8') as f:
+                json.dump([], f)
     else:
         print(f"\nERROR: No se generó la base de datos.")
     
