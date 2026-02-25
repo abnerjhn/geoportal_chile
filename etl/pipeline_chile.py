@@ -110,17 +110,19 @@ def process_and_export():
             if name in ["concesiones_mineras_const", "concesiones_mineras_tramite"]:
                 json_output = os.path.join(map_data_dir, f"{name}.json")
                 print(f"    Simplificando para el mapa y guardando en {json_output}...")
-                # Una simplificación muy leve para no perder precisión pero bajar peso
-                # 0.0001 es aprox 10 metros, suficiente para visualización rápida
+                
+                # 1. Limpieza estricta de geometrías NULL/Vacias (según lo reportado por el usuario)
                 gdf_simple = gdf.copy()
-                gdf_simple.geometry = gdf_simple.geometry.simplify(0.0001, preserve_topology=True)
-                # Solo exportamos columnas básicas para el mapa para ahorrar ancho de banda
-                # NOMBRE, SITUACION, TIPO_CONCE, TITULAR_NO, ORIGEN
-                cols_mapa = ['nombre', 'situacion', 'tipo_conce', 'titular_no', 'origen', 'geometry']
-                # Filtrar solo si existen
-                cols_existentes = [c for c in cols_mapa if c in gdf_simple.columns or c == 'geometry']
-                gdf_simple[cols_existentes].to_file(json_output, driver='GeoJSON')
-                print(f"    JSON del mapa OK")
+                gdf_simple = gdf_simple[gdf_simple.geometry.notnull()]
+                gdf_simple = gdf_simple[~gdf_simple.geometry.is_empty]
+                
+                # 2. Simplificación más agresiva (0.0005 ~50m) para compensar volumen de datos
+                gdf_simple.geometry = gdf_simple.geometry.simplify(0.0005, preserve_topology=True)
+                
+                # 3. Minificación Total: No exportamos metadata al mapa para ahorrar ancho de banda.
+                # El FeatureInfo API se encarga de dar los datos al hacer clic.
+                gdf_simple[['geometry']].to_file(json_output, driver='GeoJSON')
+                print(f"    JSON del mapa OK (Optimizado V17)")
                 del gdf_simple
             
             del gdf # IMPORTANTE: Liberar memoria

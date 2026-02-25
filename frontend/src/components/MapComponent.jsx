@@ -116,16 +116,12 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                         }
                     },
                     'concesiones_mineras_const': {
-                        type: 'vector',
-                        tiles: [`${window.location.origin}/api/tiles/concesiones_mineras_const/{z}/{x}/{y}.pbf`],
-                        minzoom: 0,
-                        maxzoom: 22
+                        type: 'geojson',
+                        data: `${window.location.origin}/data/concesiones_mineras_const.json`
                     },
                     'concesiones_mineras_tramite': {
-                        type: 'vector',
-                        tiles: [`${window.location.origin}/api/tiles/concesiones_mineras_tramite/{z}/{x}/{y}.pbf`],
-                        minzoom: 0,
-                        maxzoom: 22
+                        type: 'geojson',
+                        data: `${window.location.origin}/data/concesiones_mineras_tramite.json`
                     }
                 },
                 layers: [

@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v16-mvt-universal-spatial-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V16_2026-02-25T06-15-00"
+        info["deploy_id"] = "v17-static-geojson-pivot"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V17_2026-02-25T06-30-00"
     except Exception as e:
         info["error"] = str(e)
     return info
