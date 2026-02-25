@@ -574,7 +574,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                                                             <div key={i} className="text-xs text-slate-400 bg-slate-950/50 p-2 rounded mt-1 border border-slate-800/50">
                                                                 <span className="block font-semibold text-slate-300 mb-1">{cm.NOMBRE || cm.nombre || "Concesión Minera"}</span>
                                                                 <span className="block text-slate-500">📊 Situación: {cm.SITUACION || cm.situacion || 'Constituida'} • Tipo: {cm.TIPO_CONCE || cm.tipo_conce || 'N/A'}</span>
-                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || cm.titular_no || 'No Definido'}</span>
+                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || cm.titular_no || 'No Definido'} • Rol: {cm.NUMERO_ROL || cm.numero_rol || 'N/A'}</span>
                                                                 <span className="block text-amber-300 mt-1">Afectación: {formatNumber(cm.area_interseccion_ha)} ha ({formatNumber(totalArea > 0 ? ((cm.area_interseccion_ha || 0) / totalArea) * 100 : 0, 1)}%)</span>
                                                             </div>
                                                         ))}
@@ -591,7 +591,7 @@ const Sidebar = ({ isAnalyzing, results, showResultsPanel, setShowResultsPanel, 
                                                             <div key={i} className="text-xs text-slate-400 bg-slate-950/50 p-2 rounded mt-1 border border-slate-800/50">
                                                                 <span className="block font-semibold text-slate-300 mb-1">{cm.NOMBRE || cm.nombre || "Concesión Minera"}</span>
                                                                 <span className="block text-slate-500">⏳ Situación: {cm.SITUACION || cm.situacion || 'En Trámite'} • Tipo: {cm.TIPO_CONCE || cm.tipo_conce || 'N/A'}</span>
-                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || cm.titular_no || 'No Definido'}</span>
+                                                                <span className="block text-slate-500 italic">👤 Titular: {cm.TITULAR_NO || cm.titular_no || 'No Definido'} • Rol: {cm.NUMERO_ROL || cm.numero_rol || 'N/A'}</span>
                                                                 <span className="block text-orange-300 mt-1">Afectación: {formatNumber(cm.area_interseccion_ha)} ha ({formatNumber(totalArea > 0 ? ((cm.area_interseccion_ha || 0) / totalArea) * 100 : 0, 1)}%)</span>
                                                             </div>
                                                         ))}
