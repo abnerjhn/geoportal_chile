@@ -116,13 +116,13 @@ def process_and_export():
                 gdf_simple = gdf_simple[gdf_simple.geometry.notnull()]
                 gdf_simple = gdf_simple[~gdf_simple.geometry.is_empty]
                 
-                # 2. Simplificación más agresiva (0.0005 ~50m) para compensar volumen de datos
-                gdf_simple.geometry = gdf_simple.geometry.simplify(0.0005, preserve_topology=True)
+                # 2. Simplificación masiva (0.001 ~100m) para carga ultrarrápida
+                gdf_simple.geometry = gdf_simple.geometry.simplify(0.001, preserve_topology=True)
                 
                 # 3. Minificación Total: No exportamos metadata al mapa para ahorrar ancho de banda.
                 # El FeatureInfo API se encarga de dar los datos al hacer clic.
                 gdf_simple[['geometry']].to_file(json_output, driver='GeoJSON')
-                print(f"    JSON del mapa OK (Optimizado V17)")
+                print(f"    JSON del mapa OK (Ultra-Optimizado V20)")
                 del gdf_simple
             
             del gdf # IMPORTANTE: Liberar memoria

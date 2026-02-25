@@ -117,11 +117,11 @@ const MapComponent = forwardRef(({ onAnalyzePolygon, isAnalyzing, activeLayers, 
                     },
                     'concesiones_mineras_const': {
                         type: 'geojson',
-                        data: `${window.location.origin}/data/concesiones_mineras_const.json`
+                        data: `/data/concesiones_mineras_const.json`
                     },
                     'concesiones_mineras_tramite': {
                         type: 'geojson',
-                        data: `${window.location.origin}/data/concesiones_mineras_tramite.json`
+                        data: `/data/concesiones_mineras_tramite.json`
                     }
                 },
                 layers: [
