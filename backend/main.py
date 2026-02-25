@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v21-metadata-and-stability-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V21_2026-02-25T08-30-00"
+        info["deploy_id"] = "v21.1-emergency-fix-json-import"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V21.1_2026-02-25T08-45-00"
     except Exception as e:
         info["error"] = str(e)
     return info
