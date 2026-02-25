@@ -107,7 +107,7 @@ def process_and_export():
             map_data_dir = os.path.abspath(os.path.join(BASE_DIR, '..', 'frontend', 'public', 'data'))
             os.makedirs(map_data_dir, exist_ok=True)
             
-            if name in ["concesiones_mineras_const", "concesiones_mineras_tramite"]:
+            if name in ["concesiones_mineras_const", "concesiones_mineras_tramite", "ecmpo", "concesiones_acuicultura"]:
                 json_output = os.path.join(map_data_dir, f"{name}.json")
                 print(f"    Simplificando para el mapa y guardando en {json_output}...")
                 
