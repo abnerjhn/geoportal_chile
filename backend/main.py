@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v17-static-geojson-pivot"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V17_2026-02-25T06-30-00"
+        info["deploy_id"] = "v18-static-data-serving-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V18_2026-02-25T06-40-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -384,8 +384,14 @@ app.add_middleware(
 )
 
 frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'dist'))
+data_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend', 'public', 'data'))
+
 if os.path.exists(frontend_dir):
     app.mount("/static", StaticFiles(directory=frontend_dir), name="frontend")
+
+# Asegurar que la carpeta de datos estáticos también se sirva
+if os.path.exists(data_dir):
+    app.mount("/data", StaticFiles(directory=data_dir), name="data")
 
 @app.get("/")
 async def root():
