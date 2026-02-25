@@ -53,7 +53,7 @@ RUN cp /tmp/public_data/*.pmtiles frontend/dist/data/ 2>/dev/null; rm -rf /tmp/p
 
 # Set environment variables
 ENV DATA_RAW_DIR=/app/data_raw
-ENV DATABASE_PATH=/app/data/chile_v2.sqlite
+ENV DATABASE_PATH=/app/data/chile_v3.sqlite
 
 # ETL will be run at RUNTIME via start.sh to avoid build timeouts on Railway
 
