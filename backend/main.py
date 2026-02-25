@@ -62,8 +62,8 @@ async def health():
             with open(log_path, 'r', encoding='utf-8') as f:
                 info["etl_log_tail"] = f.read()[-2000:]
         
-        info["deploy_id"] = "v15-mvt-and-feature-info-fix"
-        info["DEBUG_MARKER"] = "FORCE_REFRESH_V15_2026-02-24T07-10-00"
+        info["deploy_id"] = "v16-mvt-universal-spatial-fix"
+        info["DEBUG_MARKER"] = "FORCE_REFRESH_V16_2026-02-25T06-15-00"
     except Exception as e:
         info["error"] = str(e)
     return info
@@ -295,8 +295,8 @@ async def get_tile(layer: str, z: int, x: int, y: int):
             all_cols = [r[1] for r in cursor.fetchall()]
             geom_col = next((c for c in all_cols if c.lower() in ['geometry', 'geom']), "geometry")
 
-            # SQL para SpatiaLite 5.0: ST_AsMVT(geom, name)
-            # NOTA: En SpatiaLite 5.0 ST_AsMVT es un agregador que solo acepta la geometría decorada por ST_AsMVTGeom
+            # SQL Universal: ST_Intersects directo (usa el optimizador RTree automático si existe)
+            # Agregamos filtro IS NOT NULL para evitar problemas con registros sin geometría
             query = f"""
             WITH 
             bounds AS (
@@ -310,11 +310,8 @@ async def get_tile(layer: str, z: int, x: int, y: int):
                         4096, 64, true
                     ) AS geom
                 FROM "{layer}" t
-                WHERE t.ROWID IN (
-                    SELECT rowid FROM SpatialIndex 
-                    WHERE f_table_name = ? 
-                    AND search_frame = ST_Transform((SELECT geom FROM bounds), 4326)
-                )
+                WHERE t."{geom_col}" IS NOT NULL 
+                AND ST_Intersects(t."{geom_col}", ST_Transform((SELECT geom FROM bounds), 4326))
             )
             SELECT ST_AsMVT(mvt_geom.geom, ?) FROM mvt_geom;
             """
@@ -351,17 +348,11 @@ async def get_feature_info(layer: str, lat: float, lon: float):
 
             query = f"""
             SELECT * FROM "{layer}" 
-            WHERE ST_Intersects("{geom_col}", ST_SetSRID(ST_Point(?, ?), 4326))
-            AND ROWID IN (
-                SELECT rowid FROM SpatialIndex 
-                WHERE f_table_name = ? 
-                AND search_frame = ST_BuildMBR(?, ?, ?, ?)
-            )
+            WHERE "{geom_col}" IS NOT NULL 
+            AND ST_Intersects("{geom_col}", ST_SetSRID(ST_Point(?, ?), 4326))
             LIMIT 1;
             """
-            # BBox pequeño para el índice
-            eps = 0.0001
-            cursor.execute(query, (lon, lat, layer, lon-eps, lat-eps, lon+eps, lat+eps))
+            cursor.execute(query, (lon, lat))
             row = cursor.fetchone()
             if row:
                 d = dict(row)
